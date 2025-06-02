@@ -1,0 +1,163 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libmariadb-dev
+          python -m pip install --upgrade pip
+          pip install -r src/requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Check for syntax errors or undefined names
+        run: | 
+          flake8 src tests --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Test with pytest
+        run: |
+          pytest
+
+      - name: Lint with flake8
+        run: | 
+          flake8 --ignore=W293,E501 src tests --show-source
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    # Only run build on tags, main and develop
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/develop'
+    steps:   
+      - name: Setup env variables
+        run: |
+          echo "DOCKER_SERVICE=ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Log into registry ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io/${{ github.repository_owner }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Is Tag Build
+        id: tag
+        if:  ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
+
+      - name: Build
+        run: ./scripts/build.sh ${{ env.DOCKER_SERVICE }} ${{ github.event.repository.url }}
+
+      - name: Tag service git id docker image
+        run: ./scripts/docker-tag.sh ${{ env.DOCKER_SERVICE }}:latest ${{ env.DOCKER_SERVICE }}:${{ github.sha }}
+
+      - name: Tag service dev docker image
+        run: ./scripts/docker-tag.sh ${{ env.DOCKER_SERVICE }}:latest ${{ env.DOCKER_SERVICE }}:dev
+
+      - name: Push service git id docker image.
+        run: ./scripts/docker-push.sh ${{ env.DOCKER_SERVICE }}:${{ github.sha }}
+
+      - name: Push dev docker image.
+        run: ./scripts/docker-push.sh ${{ env.DOCKER_SERVICE }}:dev
+
+      - name: Push latest service docker image
+        if: ${{ steps.tag.conclusion != 'skipped' }}
+        run: ./scripts/docker-push.sh ${{ env.DOCKER_SERVICE }}:latest
+
+      - name: Tag version service docker image
+        if: ${{ steps.tag.conclusion != 'skipped' }}
+        run: ./scripts/docker-tag.sh ${{ env.DOCKER_SERVICE }}:latest ${{ env.DOCKER_SERVICE }}:${{ steps.tag.outputs.VERSION }}
+
+      - name: Push version service docker image.
+        if: ${{ steps.tag.conclusion != 'skipped' }}
+        run: ./scripts/docker-push.sh ${{ env.DOCKER_SERVICE }}:${{ steps.tag.outputs.VERSION }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Is Tag Build
+        id: tag
+        if:  ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
+
+      - name: Set Branch Name
+        id: branch
+        if: ${{ contains('main,develop', github.ref_name) }}
+        run: |
+          branch_name=${GITHUB_REF##*/}
+          if [[ "$branch_name" == "develop" ]]; then
+            echo "branch=test" >> $GITHUB_OUTPUT
+          elif [[ "$branch_name" == "main" ]]; then
+            echo "branch=test" >> $GITHUB_OUTPUT
+          else
+            echo "branch=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if secret exists
+        id: check_secret
+        run: |
+          if [ -z "${{ secrets.AUTO_DEPLOY }}" ]; then
+            echo "secret_exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "secret_exists=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout Target Repository
+        id: checkout
+        uses: actions/checkout@v4
+        if: ${{ (steps.tag.conclusion != 'skipped' || steps.branch.outputs.branch != 'unknown') && steps.check_secret.outputs.secret_exists == 'true' }}
+        with:
+          repository: Randers-Kommune-Digitalisering/kithosting-randers-kommune-apps
+          ref: ${{ steps.tag.conclusion != 'skipped' && 'prod' || 'test' }} 
+          path: infrastructure
+          ssh-key: ${{ secrets.AUTO_DEPLOY }}
+          
+      - name: Install yq
+        if: ${{ steps.checkout.conclusion == 'success' }}
+        run: |
+          sudo apt install -y jq
+
+      - name: Update with sha
+        id: shaupdate
+        if: ${{ steps.checkout.conclusion == 'success' && steps.tag.conclusion == 'skipped' && steps.branch.outputs.branch == 'test'}}
+        run: |
+          yq e ".service.image.tag = \"${{ github.sha }}\"" -i infrastructure/python-app-template/values.yaml
+
+      - name: Update with tag
+        id: tagupdate
+        if: ${{ steps.checkout.conclusion == 'success' && steps.tag.conclusion != 'skipped' }}
+        run: |
+          yq e ".service.image.tag = \"${{ steps.tag.outputs.VERSION }}\"" -i infrastructure/python-app-template/values.yaml
+
+      - name: Commit and push
+        if: ${{ steps.shaupdate.outcome == 'success' || steps.tagupdate.outcome == 'success' }}
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          cd infrastructure
+          if [[ -n "$(git status -s)" ]]; then
+            git commit -am "Update version"
+            git push
+          fi
