@@ -3,23 +3,8 @@ import logging
 import re
 
 from werkzeug import serving
-from prometheus_client import Gauge, Counter, Summary
 
 from utils.config import DEBUG
-
-# Prometheus metricts
-
-# Availavility metrics
-is_ready_gauge = Gauge('is_ready', '1 - app is running, 0 - app is down', labelnames=['error_type', 'job_name'])
-last_updated_gauge = Gauge('last_updated_ms', "Timestamp in milliseconds of the last time the app's availability was updated")
-
-# Dependency metrics
-is_available_gauge = Gauge('is_available', '1 - dependency is available, 0 - dependency is not available', labelnames=['dependency_name'])
-
-# Job metrics
-job_start_counter = Counter('job_start', 'Number of times a job has started', labelnames=['job_name'])
-job_complete_counter = Counter('job_complete', 'Number of times a job has completed', labelnames=['job_name', 'status'])
-job_duration_summary = Summary('job_duration_s', 'Duration of a job in seconds', labelnames=['job_name', 'status'])
 
 
 # Logging configuration

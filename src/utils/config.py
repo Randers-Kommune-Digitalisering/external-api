@@ -10,8 +10,13 @@ DEBUG = os.getenv('DEBUG', 'False') in ['True', 'true']
 PORT = os.getenv('PORT', '8080')
 POD_NAME = os.getenv('POD_NAME', 'pod_name_not_set')
 
-# DB_USER = os.environ["DB_USER"].strip()
-# DB_PASS = os.environ["DB_PASS"].strip()
-# DB_HOST = os.environ["DB_HOST"].strip()
-# DB_PORT = os.environ["DB_PORT"].strip()
-# DB_DATABASE = os.environ["DB_DATABASE"].strip()
+KEYCLOAK_URL = os.environ["KEYCLOAK_URL"].strip()
+KEYCLOAK_REALM = os.environ["KEYCLOAK_REALM"].strip()
+KEYCLOAK_AUDIENCE = os.environ["KEYCLOAK_AUDIENCE"].strip()
+
+SKOLE_AD_DB_USER = os.environ["SKOLE_AD_DB_USER"].strip()
+SKOLE_AD_DB_PASS = os.environ["SKOLE_AD_DB_PASS"].strip()
+SKOLE_AD_DB_HOST = os.environ["SKOLE_AD_DB_HOST"].strip()
+SKOLE_AD_DB_PORT = os.environ["SKOLE_AD_DB_PORT"].strip()
+SKOLE_AD_DB_NAME = os.environ["SKOLE_AD_DB_NAME"].strip()
+SKOLE_AD_DB_SCHEMA = "skolead"

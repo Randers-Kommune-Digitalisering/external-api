@@ -1,56 +1,83 @@
+import os
 import logging
-import time
+import pandas as pd
 
-from datetime import timedelta
-from flask import Blueprint, Response, request
+from sqlalchemy import text
+from flask import Blueprint, Response, request, jsonify
 
-from utils.config import POD_NAME
-from utils.logging import is_ready_gauge, last_updated_gauge, job_start_counter, job_complete_counter, job_duration_summary
+from utils.openid_integration import AuthorizationHelper
+from utils.database import DatabaseClient
+from utils.config import SKOLE_AD_DB_HOST, SKOLE_AD_DB_USER, SKOLE_AD_DB_PASS, SKOLE_AD_DB_NAME, SKOLE_AD_DB_SCHEMA, KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE
+from datetime import datetime
+import glob
 
 logger = logging.getLogger(__name__)
-api_endpoints = Blueprint('api', __name__, url_prefix='/api')
-
-# NB: uncomment code in main.py to enable these endpoints
-# Any endpoints added here will be available at /api/<endpoint> - e.g. http://127.0.0.1:8080/api/example
-# Change the the example below to suit your needs + add more as needed
+api_endpoints = Blueprint('api', __name__)
+ah = AuthorizationHelper(KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE)
+db_client = DatabaseClient(db_type="postgresql", database=SKOLE_AD_DB_NAME, username=SKOLE_AD_DB_USER, password=SKOLE_AD_DB_PASS, host=SKOLE_AD_DB_HOST)
 
 
-@api_endpoints.route('/example', methods=['GET', 'POST'])
-def example():
+@api_endpoints.route('/skole-ad-file', methods=['GET', 'POST'])
+@ah.authorization
+def skole_ad_file():
     if request.method == 'POST':
-        if request.headers.get('Content-Type') == 'application/json':
-            payload = request.get_json()
+        if 'file' not in request.files:
+            return Response('No file part in the request', status=400)
 
-            # -- Example job with example use of metrics -- #
-            is_ready_gauge.labels(error_type='working', job_name=POD_NAME).set(0)
-            last_updated_gauge.set_to_current_time()
+        file = request.files['file']
+        if file.filename == '':
+            return Response('No selected file', status=400)
 
-            job_start_counter.labels(job_name='example job').inc()
+        added_to_db = False
+        saved_to_disk = False
 
-            start_time = time.time()
-            logger.info('Doing important job - that somehow prevents the app from being ready')
-            duration = timedelta(seconds=(time.time() - start_time))
+        try:
+            file.save(file.filename)
+            saved_to_disk = True
+        except Exception as e:
+            logger.error(f"Failed to save file {file.filename}: {e}")
 
-            job_duration_summary.labels(job_name='example job', status='success').observe(duration.total_seconds())
-            job_complete_counter.labels(job_name='example job', status='success').inc()
+        try:
+            with db_client.get_connection() as conn:
+                conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SKOLE_AD_DB_SCHEMA}"))
+                conn.commit()
+                filename = file.filename
+                file_ext = os.path.splitext(filename)[1].lower()
 
-            is_ready_gauge.labels(error_type=None, job_name=POD_NAME).set(1)
-            last_updated_gauge.set_to_current_time()
-            # --------------------------------------------- #
+                if file_ext == '.csv':
+                    df = pd.read_csv(file)
+                elif file_ext in ['.xls', '.xlsx']:
+                    df = pd.read_excel(file)
+                else:
+                    raise ValueError(f"Unsupported file type: {file_ext}")
 
-            return Response(f'You posted: {payload}', status=200)
+                df['updated'] = datetime.now()
+
+                df.to_sql('person', con=conn, schema=SKOLE_AD_DB_SCHEMA, if_exists='replace', index=False)
+                added_to_db = True
+                conn.commit()
+                logger.info(f"File {filename} processed and added to the database.")
+        except Exception as e:
+            logger.error(f"Failed to add file {filename} to database: {e}")
+
+        if added_to_db and saved_to_disk:
+            return Response('File saved successfully', status=200)
+        elif added_to_db:
+            return Response('File only added to the database', status=200)
+        elif saved_to_disk:
+            return Response('File only saved to disk', status=200)
         else:
-            return Response('Content-Type must be application/json', status=400)
+            logger.error("Failed to save file or add to database.")
+            return Response('Failed to save file', status=500)
     else:
-        # -- Example job with example use of metrics -- #
-        job_start_counter.labels(job_name='another example job').inc()
-
-        start_time = time.time()
-        logger.info('Doing important job - that does NOT prevent the app from being ready')
-        duration = timedelta(seconds=(time.time() - start_time))
-
-        job_duration_summary.labels(job_name='another example job', status='success').observe(duration.total_seconds())
-        job_complete_counter.labels(job_name='another example job', status='success').inc()
-        # --------------------------------------------- #
-
-        return Response('Example response', status=200)
+        filename = request.args.get('filename')
+        if not filename:
+            files = [os.path.basename(f) for f in glob.glob("*.csv") + glob.glob("*.xls") + glob.glob("*.xlsx")]
+            return jsonify({'files': files}), 200
+        try:
+            return Response(open(filename, 'rb').read(), mimetype='application/octet-stream')
+        except FileNotFoundError:
+            return Response('File not found', status=404)
+        except Exception as e:
+            logger.error(f"Error reading file {filename}: {e}")
+            return Response('Internal server error', status=500)

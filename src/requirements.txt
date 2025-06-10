@@ -1,5 +1,8 @@
 Flask==3.0.3
 mariadb
+openpyxl
+pandas
+PyJWT
 pymssql
 py-healthcheck
 pysftp
