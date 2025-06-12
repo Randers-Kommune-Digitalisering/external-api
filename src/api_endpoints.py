@@ -45,7 +45,8 @@ def skole_ad_file():
                 file_ext = os.path.splitext(filename)[1].lower()
 
                 if file_ext == '.csv':
-                    df = pd.read_csv(file)
+                    file.seek(0)
+                    df = pd.read_csv(file.stream, sep=';', encoding='cp1252')
                 elif file_ext in ['.xls', '.xlsx']:
                     df = pd.read_excel(file)
                 else:
