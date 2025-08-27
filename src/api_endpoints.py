@@ -37,11 +37,12 @@ def skole_ad_file():
         except Exception as e:
             logger.error(f"Failed to save file {file.filename}: {e}")
 
+        filename = file.filename
+
         try:
             with db_client.get_connection() as conn:
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SKOLE_AD_DB_SCHEMA}"))
                 conn.commit()
-                filename = file.filename
                 file_ext = os.path.splitext(filename)[1].lower()
 
                 if file_ext == '.csv':
