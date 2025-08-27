@@ -2,6 +2,7 @@ Flask==3.0.3
 mariadb
 openpyxl
 pandas
+paramiko==3.4.0
 PyJWT
 pymssql
 py-healthcheck
