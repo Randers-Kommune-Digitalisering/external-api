@@ -128,4 +128,4 @@ def add_user_to_group():
             user_added = True
         except Exception as e:
             logger.error(f"Failed to add user to group: {e}")
-    jsonify({"user_added": "yes" if user_added else "no"}), 200
+    return jsonify({"user_added": "yes" if user_added else "no"}), 200
