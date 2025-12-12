@@ -107,15 +107,23 @@ def add_user_to_group():
         client_secret=KEYCLOAK_USER_ADMIN_CLIENT_SECRET
     )
 
+    logger.info(data)
+
     user_id = session.get(
         url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/users",
         params={'email': data['email']}
     ).json()
+    logger.info("Fetched user ID:")
+    logger.info(user_id)
+    logger.info(len(user_id))
 
     group_id = session.get(
         url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/groups",
         params={'search': data['group']}
     ).json()
+    logger.info("Fetched group ID:")
+    logger.info(group_id)
+    logger.info(len(group_id))
 
     user_added = False
     if len(user_id) != 1 or len(group_id) != 1:
