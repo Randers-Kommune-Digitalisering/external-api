@@ -107,33 +107,30 @@ def add_user_to_group():
         client_secret=KEYCLOAK_USER_ADMIN_CLIENT_SECRET
     )
 
-    logger.info(data)
-
     user_id = session.get(
         url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/users",
         params={'email': data['email']}
     ).json()
-    logger.info("Fetched user ID:")
-    logger.info(user_id)
-    logger.info(len(user_id))
 
     group_id = session.get(
         url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/groups",
         params={'search': data['group']}
     ).json()
-    logger.info("Fetched group ID:")
-    logger.info(group_id)
-    logger.info(len(group_id))
 
     user_added = False
+    message = "Der er desværre sket en fejl i forbindelse med tildeling af rettigheder. For at få rettet op på dette bedes I venligst videresende denne mail til digitalisering@randers.dk."
+    error = None
     if len(user_id) != 1 or len(group_id) != 1:
         logger.error('User or group not found or multiple matches found')
+        error = 'User or group not found or multiple matches found'
     else:
         try:
             session.put(
                 url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id[0]['id']}/groups/{group_id[0]['id']}"
             )
             user_added = True
+            message = "Du har nu fået tildelt de ønskede rettigheder."
         except Exception as e:
             logger.error(f"Failed to add user to group: {e}")
-    return jsonify({"user_added": "yes" if user_added else "no"}), 200
+            error = str(e)
+    return jsonify({"user_added": user_added, "message": message, "error": error}), 200
