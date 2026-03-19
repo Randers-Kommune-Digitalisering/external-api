@@ -110,12 +110,12 @@ def add_user_to_group():
     )
 
     user_id = session.get(
-        url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/users",
+        url=f"{keycloak_url}auth/admin/realms/{KEYCLOAK_REALM}/users",
         params={'email': data['email']}
     ).json()
 
     group_id = session.get(
-        url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/groups",
+        url=f"{keycloak_url}auth/admin/realms/{KEYCLOAK_REALM}/groups",
         params={'search': data['group']}
     ).json()
 
@@ -128,7 +128,7 @@ def add_user_to_group():
     else:
         try:
             session.put(
-                url=f"{keycloak_url}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id[0]['id']}/groups/{group_id[0]['id']}"
+                url=f"{keycloak_url}auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id[0]['id']}/groups/{group_id[0]['id']}"
             )
             user_added = True
             message = "Du har nu fået tildelt de ønskede rettigheder."
