@@ -137,3 +137,12 @@ def add_user_to_group():
             logger.error(f"Failed to add user to group: {e}")
             error = str(e)
     return jsonify({"user_added": user_added, "message": message, "error": error}), 200
+
+
+
+@api_endpoints.route('/add-gis-data-to-db', methods=['POST'])
+@ah.authorization
+def add_gis_data_to_db():
+    data = request.get_json()
+    print(data)
+    return jsonify({"message": "GIS data received"}), 200
