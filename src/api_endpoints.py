@@ -139,7 +139,6 @@ def add_user_to_group():
     return jsonify({"user_added": user_added, "message": message, "error": error}), 200
 
 
-
 @api_endpoints.route('/add-gis-data-to-db', methods=['POST'])
 @ah.authorization
 def add_gis_data_to_db():
