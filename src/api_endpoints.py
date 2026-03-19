@@ -127,9 +127,10 @@ def add_user_to_group():
         error = 'User or group not found or multiple matches found'
     else:
         try:
-            session.put(
+            res = session.put(
                 url=f"{keycloak_url}auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id[0]['id']}/groups/{group_id[0]['id']}"
             )
+            res.raise_for_status()
             user_added = True
             message = "Du har nu fået tildelt de ønskede rettigheder."
         except Exception as e:
