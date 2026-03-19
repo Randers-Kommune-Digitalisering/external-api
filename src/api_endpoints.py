@@ -12,6 +12,7 @@ from utils.token_provider import BearerAuth
 from utils.config import SKOLE_AD_DB_HOST, SKOLE_AD_DB_USER, SKOLE_AD_DB_PASS, SKOLE_AD_DB_NAME, SKOLE_AD_DB_SCHEMA, KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE, KEYCLOAK_USER_ADMIN_CLIENT_ID, KEYCLOAK_USER_ADMIN_CLIENT_SECRET
 from datetime import datetime
 import glob
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 api_endpoints = Blueprint('api', __name__)
@@ -95,10 +96,11 @@ def add_user_to_group():
         return Response('Missing required keys: email and group', status=400)
 
     keycloak_url = KEYCLOAK_URL
+    parsed = urlparse(keycloak_url)
+    if not parsed.scheme:
+        keycloak_url = "https://" + keycloak_url.lstrip("/")
     if not keycloak_url.endswith("/"):
         keycloak_url += "/"
-    if not keycloak_url.startswith("https://"):
-        keycloak_url = "https://" + keycloak_url.lstrip("/")
 
     session = requests.Session()
     session.auth = BearerAuth(
