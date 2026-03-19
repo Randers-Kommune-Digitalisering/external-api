@@ -44,7 +44,7 @@ class AuthorizationHelper:
             return None
         except jwt.InvalidTokenError:
             return None
-    
+
     # Decorator - checks token
     def authorization(self, f):
         @wraps(f)
