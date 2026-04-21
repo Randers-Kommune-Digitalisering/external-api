@@ -23,3 +23,10 @@ SKOLE_AD_DB_HOST = os.environ["SKOLE_AD_DB_HOST"].strip()
 SKOLE_AD_DB_PORT = os.environ["SKOLE_AD_DB_PORT"].strip()
 SKOLE_AD_DB_NAME = os.environ["SKOLE_AD_DB_NAME"].strip()
 SKOLE_AD_DB_SCHEMA = "skolead"
+
+GIS_DB_USER = os.environ["GIS_DB_USER"].strip()
+GIS_DB_PASS = os.environ["GIS_DB_PASS"].strip()
+GIS_DB_HOST = os.environ["GIS_DB_HOST"].strip()
+GIS_DB_PORT = os.environ["GIS_DB_PORT"].strip()
+GIS_DB_NAME = os.environ["GIS_DB_NAME"].strip()
+GIS_DB_SCHEMA = "s34_xflow"
