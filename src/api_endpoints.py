@@ -145,7 +145,7 @@ def add_user_to_group():
 
 
 @api_endpoints.route('/add-gis-raagereder-data-to-db', methods=['POST'])
-# @ah.authorization
+@ah.authorization
 def add_gis_raagereder_data_to_db():
     print("Testing")
     data = request.get_json()
