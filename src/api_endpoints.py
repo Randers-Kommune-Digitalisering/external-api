@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 api_endpoints = Blueprint('api', __name__)
 ah = AuthorizationHelper(KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE)
 db_client_meta = DatabaseClient(db_type="postgresql", database=SKOLE_AD_DB_NAME, username=SKOLE_AD_DB_USER, password=SKOLE_AD_DB_PASS, host=SKOLE_AD_DB_HOST)
-db_client_gis = DatabaseClient(db_type="postgresql", database=GIS_DB_NAME, username=GIS_DB_USER, password=GIS_DB_PASS, host=GIS_DB_HOST)
+db_client_gis = DatabaseClient(db_type="postgresql", database=GIS_DB_NAME, username=GIS_DB_USER, password=GIS_DB_PASS, host=GIS_DB_HOST, port=GIS_DB_PORT)
 
 
 @api_endpoints.route('/skole-ad-file', methods=['GET', 'POST'])
@@ -147,6 +147,7 @@ def add_user_to_group():
 @api_endpoints.route('/add-gis-raagereder-data-to-db', methods=['POST'])
 # @ah.authorization
 def add_gis_raagereder_data_to_db():
+    print("Testing")
     data = request.get_json()
     if not data or 'geojson' not in data:
         return Response('Missing required key geojson', status=400)
