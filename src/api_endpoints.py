@@ -150,10 +150,10 @@ def add_gis_raagereder_data_to_db():
     data = request.get_json()
     if not data or 'geojson' not in data:
         return Response('Missing required key geojson', status=400)
-    print(data)
     try:
+        geojson = json.loads(data['geojson'])
         with db_client_gis.get_connection() as conn:
-            for feature in data['geojson']['features']:
+            for feature in geojson['features']:
                 geom_json = json.dumps(feature['geometry'])
                 sql = (
                     f"INSERT INTO {GIS_DB_SCHEMA}.aktive_raagereder_rk_all (wkb_geometry) "
