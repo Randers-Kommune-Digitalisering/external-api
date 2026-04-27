@@ -151,11 +151,8 @@ def add_gis_raagereder_data_to_db():
     if not data or 'geojson' not in data:
         return Response('Missing required key geojson', status=400)
     try:
-        geojson_str = data['geojson']
-        geojson = json.loads(geojson_str)
-        oprettet_dato = datetime.now()
+        geojson = json.loads(data['geojson'])
         with db_client_gis.get_connection() as conn:
-            # Get next available id
             id_sql = f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {GIS_DB_SCHEMA}.aktive_raagereder_rk_all"
             result = conn.execute(text(id_sql))
             next_id = result.scalar() if result else 1
@@ -165,10 +162,11 @@ def add_gis_raagereder_data_to_db():
                     f"INSERT INTO {GIS_DB_SCHEMA}.aktive_raagereder_rk_all (wkb_geometry, oprettet_dato, geojson, id) "
                     f"VALUES (ST_SetSRID(ST_GeomFromGeoJSON('{geom_json}'), 25832), :oprettet_dato, :geojson, :id);"
                 )
-                conn.execute(text(sql), {'oprettet_dato': oprettet_dato, 'geojson': geojson_str, 'id': next_id})
+                oprettet_dato = datetime.now()
+                conn.execute(text(sql), {'oprettet_dato': oprettet_dato, 'geojson': geom_json, 'id': next_id})
             conn.commit()
             logger.info("GIS raagereder data added to database.")
     except Exception as e:
-        logger.error(f"ERORR adding GIS raagereder data to database: {e}")
+        logger.error(f"ERROR adding GIS raagereder data to database: {e}")
         return Response('Failed to add GIS raagereder data to database', status=500)
     return jsonify({"message": "GIS raagereder data modtaget"}), 200
