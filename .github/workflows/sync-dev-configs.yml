@@ -1,0 +1,141 @@
+name: Sync dev-configs
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-dev-configs
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        env:
+          YQ_VERSION: v4.44.3
+        run: |
+          set -euo pipefail
+          sudo curl -sSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Read sync map
+        id: map
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          map_file=".github/dev-configs-sync.yml"
+          if [[ ! -f "${map_file}" ]]; then
+            echo "Sync map not found: ${map_file}" >&2
+            exit 1
+          fi
+
+          repo="$(yq e -r '.dev_configs.repo' "${map_file}")"
+          ref="$(yq e -r '.dev_configs.ref' "${map_file}")"
+
+          if [[ -z "${repo}" || "${repo}" == "null" ]]; then
+            echo "Missing dev_configs.repo in ${map_file}" >&2
+            exit 1
+          fi
+          if [[ -z "${ref}" || "${ref}" == "null" ]]; then
+            echo "Missing dev_configs.ref in ${map_file}" >&2
+            exit 1
+          fi
+
+          echo "repo=${repo}" >> "$GITHUB_OUTPUT"
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+          echo "map_file=${map_file}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify dev-configs token is available
+        shell: bash
+        env:
+          DEV_CONFIGS_TOKEN: ${{ secrets.CONFIG_SYNC }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DEV_CONFIGS_TOKEN}" ]]; then
+            echo "Missing required secret: CONFIG_SYNC" >&2
+            echo "The built-in GITHUB_TOKEN cannot read other private repos (like dev-configs)." >&2
+            echo "Create a fine-grained PAT (read-only) with access to ${{ steps.map.outputs.repo }}" >&2
+            echo "and add it as repository/org secret named CONFIG_SYNC." >&2
+            exit 1
+          fi
+
+      - name: Checkout dev-configs
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.map.outputs.repo }}
+          ref: ${{ steps.map.outputs.ref }}
+          path: dev-configs
+          token: ${{ secrets.CONFIG_SYNC }}
+
+      - name: Sync files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          map_file="${{ steps.map.outputs.map_file }}"
+
+          while IFS=$'\t' read -r dev_path repo_path; do
+            dev_path="${dev_path%$'\r'}"
+            repo_path="${repo_path%$'\r'}"
+            if [[ -z "${dev_path}" || -z "${repo_path}" || "${dev_path}" == "null" || "${repo_path}" == "null" ]]; then
+              echo "Invalid mapping entry: dev_path='${dev_path}' repo_path='${repo_path}'" >&2
+              exit 1
+            fi
+
+            src="dev-configs/${dev_path}"
+            dst="${repo_path}"
+
+            if [[ ! -f "${src}" ]]; then
+              echo "Source file missing in dev-configs: ${src}" >&2
+              exit 1
+            fi
+
+            if [[ ! -f "${dst}" ]]; then
+              echo "Destination file missing in this repo: ${dst}" >&2
+              echo "(Per policy, this workflow does not create missing destination files.)" >&2
+              exit 1
+            fi
+
+            mkdir -p "$(dirname "${dst}")"
+            cp "${src}" "${dst}"
+          done < <(yq e -r '.mappings[] | [.dev_path, .repo_path] | @tsv' "${map_file}")
+
+      - name: Remove dev-configs checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dev-configs
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: |
+            setup.cfg
+            .github
+          commit-message: "chore: sync dev-configs"
+          title: "chore: sync dev-configs"
+          body: |
+            Automated sync from `${{ steps.map.outputs.repo }}` (ref `${{ steps.map.outputs.ref }}`).
+
+            Source map: `${{ steps.map.outputs.map_file }}`
+          branch: "chore/sync-dev-configs"
+          delete-branch: true
+          labels: |
+            dependencies
+            automation

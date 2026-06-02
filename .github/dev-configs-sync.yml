@@ -1,0 +1,22 @@
+# Sync-map for generated Flask repos.
+# The workflow copies files from `dev-configs` into the generated repository.
+#
+# Notes:
+# - Destination files must already exist; the workflow fails if a destination is missing.
+
+dev_configs:
+  repo: Randers-Kommune-Digitalisering/dev-configs
+  ref: main
+
+mappings:
+  # Copilot instruction files
+  - dev_path: copilot-instructions/documentation-standards.instructions.md
+    repo_path: .github/instructions/documentation-standards.instructions.md
+  - dev_path: copilot-instructions/pr-review.instructions.md
+    repo_path: .github/instructions/pr-review.instructions.md
+  - dev_path: copilot-instructions/python-conventions.instructions.md
+    repo_path: .github/instructions/python-conventions.instructions.md
+  
+  # Dependabot config
+  - dev_path: dependabot/dependabot.yml
+    repo_path: .github/dependabot.yml
