@@ -1,0 +1,40 @@
+# Dependabot configuration file
+version: 2
+
+updates:
+  # Python dependencies (security updates only)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Copenhagen"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "pip"
+    security-updates-only: true
+
+  # Python dependencies (all updates)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Copenhagen"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "pip"
+
+  # GitHub Actions dependencies (all updates)
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Copenhagen"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "actions"

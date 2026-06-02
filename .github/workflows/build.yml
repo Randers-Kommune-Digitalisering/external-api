@@ -1,50 +1,131 @@
-# This is a basic workflow to help you get started with Actions
-
 name: Build
 
-# Controls when the workflow will run
 on:
-  # Allows you to run this workflow manually from the Actions tab
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:   
-      # Set docker image names.
-      - name: Setup env variables
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up build variables
+        id: vars
+        shell: bash
         run: |
-          echo "DOCKER_SERVICE=ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          set -euo pipefail
 
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+          commit_sha="$(git rev-parse HEAD)"
 
-# Login against a Docker registry except on PR
-# https://github.com/docker/login-action
-      - name: Log into registry ghcr.io
+          # github.repository is "Owner/Repo".
+          repo_lower="${GITHUB_REPOSITORY,,}"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+
+          echo "repo_name=${repo_name}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${repo_lower}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${commit_sha}" >> "$GITHUB_OUTPUT"
+
+          # Only set version when building a v* tag.
+          # Supports tags like v1.2.3 and v.1.2 (the leading dot is stripped).
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            version="${version#.}"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log into registry (GHCR)
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io/${{ github.repository_owner }}
+          registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}     
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-# Build
-      - name: Build
-        run: ./scripts/build.sh ${{ env.DOCKER_SERVICE }} ${{ github.event.repository.url }}
+      - name: Retag existing image for release
+        id: retag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
 
-# Push to Github
-      - name: Tag service git id docker image
-        run: ./scripts/docker-tag.sh ${{ env.DOCKER_SERVICE }}:latest ${{ env.DOCKER_SERVICE }}:${{ github.sha }}
+          image='${{ steps.vars.outputs.image }}'
+          commit_sha='${{ steps.vars.outputs.commit_sha }}'
+          version='${{ steps.vars.outputs.version }}'
 
-      - name: Tag service dev docker image
-        run: ./scripts/docker-tag.sh ${{ env.DOCKER_SERVICE }}:latest ${{ env.DOCKER_SERVICE }}:dev
+          if [[ -z "${version}" ]]; then
+            echo "did_retag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      - name: Push dev docker image.
-        run: ./scripts/docker-push.sh ${{ env.DOCKER_SERVICE }}:dev
+          # Avoid rebuilding on tag pushes: if the commit was already built on main,
+          # the image exists as :<commit_sha>. We can retag that image.
+          if ! docker pull "${image}:${commit_sha}"; then
+            echo "Image ${image}:${commit_sha} not found; falling back to build." >&2
+            echo "did_retag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      - name: Push service git id docker image.
-        run: ./scripts/docker-push.sh ${{ env.DOCKER_SERVICE }}:${{ github.sha }}
+          docker tag "${image}:${commit_sha}" "${image}:${version}"
+          docker tag "${image}:${commit_sha}" "${image}:latest"
+          docker push "${image}:${version}"
+          docker push "${image}:latest"
+
+          echo "did_retag=true" >> "$GITHUB_OUTPUT"
+
+      - name: Compute Docker tags
+        id: tags
+        if: ${{ !(startsWith(github.ref, 'refs/tags/v') && steps.retag.outputs.did_retag == 'true') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image='${{ steps.vars.outputs.image }}'
+          version='${{ steps.vars.outputs.version }}'
+          commit_sha='${{ steps.vars.outputs.commit_sha }}'
+
+          tags="${image}:${commit_sha}"
+
+          # Tag main builds as :dev
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=$'\n'"${image}:dev"
+          fi
+
+          # Tag release builds (v*) as :latest and :<version>
+          if [[ "${GITHUB_REF}" == refs/tags/v* && -n "${version}" ]]; then
+            tags+=$'\n'"${image}:latest"
+            tags+=$'\n'"${image}:${version}"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${tags}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        if: ${{ !(startsWith(github.ref, 'refs/tags/v') && steps.retag.outputs.did_retag == 'true') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

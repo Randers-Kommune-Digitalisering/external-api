@@ -1,0 +1,172 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - Build
+    types:
+      - completed
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  INFRA_REPO: Randers-Kommune-Digitalisering/kithosting-randers-kommune-apps
+  INFRA_REF: prod
+  # YAML path to the image tag field to update.
+  INFRA_VALUES_EXPR: .service.image.tag
+  YQ_VERSION: v4.44.3
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up variables
+        id: vars
+        shell: bash
+        env:
+          AUTO_DEPLOY: ${{ secrets.AUTO_DEPLOY }}
+        run: |
+          set -euo pipefail
+
+          repo_name="${GITHUB_REPOSITORY#*/}"
+
+          # Which commit are we considering for deployment?
+          # Resolve to the commit SHA behind the checked-out ref (important for annotated tags).
+          deploy_sha="$(git rev-parse HEAD)"
+
+          # Find a release tag pointing at the commit (e.g. v1.2.3 or v.1.2).
+          # If multiple tags exist, prefer the highest version.
+          tag_name=""
+          while IFS= read -r candidate; do
+            if [[ "${candidate}" =~ ^v\.?[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+              tag_name="${candidate}"
+              break
+            fi
+          done < <(git tag --points-at "${deploy_sha}" --list 'v*' --sort=-v:refname)
+
+          if [[ -n "${tag_name}" ]]; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+            version="${tag_name#v}"
+            version="${version#.}"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "tag_name=" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "deploy_sha=${deploy_sha}" >> "$GITHUB_OUTPUT"
+          echo "repo_name=${repo_name}" >> "$GITHUB_OUTPUT"
+
+          # Deploy key is provided via the secret name AUTO_DEPLOY.
+          # If the repository has a repo-level secret with the same name, GitHub will use it.
+          # If the org-level secret is not accessible to this repo, it will be an empty string.
+          if [[ -n "${AUTO_DEPLOY}" ]]; then
+            echo "has_deploy_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_deploy_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify tagged commit is on main
+        if: steps.vars.outputs.should_deploy == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fetch the current main tip for an accurate ancestry check.
+          # Note: `git fetch origin prod` updates FETCH_HEAD, which is safer to compare against than
+          # relying on refs/remotes/origin/prod being updated in all environments.
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${{ steps.vars.outputs.deploy_sha }}" "FETCH_HEAD"; then
+            echo "Skipping deploy: ${GITHUB_REPOSITORY}@${{ steps.vars.outputs.deploy_sha }} is not on main." 
+            echo "tag=${{ steps.vars.outputs.tag_name }}"
+            exit 0
+          fi
+
+      - name: Skip deploy (no release tag)
+        if: steps.vars.outputs.should_deploy != 'true'
+        shell: bash
+        run: |
+          echo "Skipping deploy: no version-like v* tag points at this build SHA."
+
+      - name: Skip deploy (no deploy key)
+        if: steps.vars.outputs.should_deploy == 'true' && steps.vars.outputs.has_deploy_key != 'true'
+        shell: bash
+        run: |
+          echo "Skipping infra update: deploy key secret (AUTO_DEPLOY) is not available to this workflow."
+
+      - name: Checkout infrastructure repo
+        if: steps.vars.outputs.should_deploy == 'true' && steps.vars.outputs.has_deploy_key == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.INFRA_REPO }}
+          ref: ${{ env.INFRA_REF }}
+          path: infrastructure
+          ssh-key: ${{ secrets.AUTO_DEPLOY }}
+
+      - name: Install yq
+        if: steps.vars.outputs.should_deploy == 'true' && steps.vars.outputs.has_deploy_key == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo curl -sSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update image tag in values.yaml
+        if: steps.vars.outputs.should_deploy == 'true' && steps.vars.outputs.has_deploy_key == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          REPO_NAME: ${{ steps.vars.outputs.repo_name }}
+        run: |
+          set -euo pipefail
+
+          cd infrastructure
+
+          values_file="${REPO_NAME}/values.yaml"
+
+          if [[ ! -f "${values_file}" ]]; then
+            echo "Expected values file not found: ${values_file}"
+            echo "Create it in the infrastructure repo, or change this workflow to match your folder structure."
+            exit 1
+          fi
+
+          yq e "${INFRA_VALUES_EXPR} = strenv(VERSION)" -i "${values_file}"
+
+      - name: Commit and push infrastructure change
+        if: steps.vars.outputs.should_deploy == 'true' && steps.vars.outputs.has_deploy_key == 'true'
+        shell: bash
+        env:
+          REPO_NAME: ${{ steps.vars.outputs.repo_name }}
+        run: |
+          set -euo pipefail
+
+          cd infrastructure
+
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+          git add "${REPO_NAME}/values.yaml"
+
+          if git diff --cached --quiet; then
+            echo "No infrastructure changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update image tag for ${REPO_NAME}"
+          git push
