@@ -170,3 +170,18 @@ def add_gis_raagereder_data_to_db():
         logger.error(f"ERROR adding GIS raagereder data to database: {e}")
         return Response('Failed to add GIS raagereder data to database', status=500)
     return jsonify({"message": "GIS raagereder data modtaget"}), 200
+
+
+@api_endpoints.route('/nexus', methods=['POST'])
+@ah.authorization
+def handle_post():
+    # Log request details
+    print("Headers:", dict(request.headers))
+    print("Query params:", request.args.to_dict())
+    print("Body (raw):", request.get_data(as_text=True))
+
+    # If JSON, log parsed JSON too
+    if request.is_json:
+        print("JSON:", request.get_json())
+
+    return jsonify({"status": "ok"}), 200
