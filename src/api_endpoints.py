@@ -1,23 +1,28 @@
 import os
 import logging
+import json
+import glob
 import requests
 import pandas as pd
 
+from datetime import datetime
+from urllib.parse import urlparse
 from sqlalchemy import text
 from flask import Blueprint, Response, request, jsonify
 
 from utils.openid_integration import AuthorizationHelper
 from utils.database import DatabaseClient
 from utils.token_provider import BearerAuth
-from utils.config import SKOLE_AD_DB_HOST, SKOLE_AD_DB_USER, SKOLE_AD_DB_PASS, SKOLE_AD_DB_NAME, SKOLE_AD_DB_SCHEMA, KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE, KEYCLOAK_USER_ADMIN_CLIENT_ID, KEYCLOAK_USER_ADMIN_CLIENT_SECRET
-from datetime import datetime
-import glob
-from urllib.parse import urlparse
+from utils.config import SKOLE_AD_DB_HOST, SKOLE_AD_DB_USER, SKOLE_AD_DB_PASS, SKOLE_AD_DB_NAME, SKOLE_AD_DB_SCHEMA, \
+    KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE, KEYCLOAK_USER_ADMIN_CLIENT_ID, KEYCLOAK_USER_ADMIN_CLIENT_SECRET, \
+    GIS_DB_USER, GIS_DB_PASS, GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_SCHEMA
+
 
 logger = logging.getLogger(__name__)
 api_endpoints = Blueprint('api', __name__)
 ah = AuthorizationHelper(KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE)
-db_client = DatabaseClient(db_type="postgresql", database=SKOLE_AD_DB_NAME, username=SKOLE_AD_DB_USER, password=SKOLE_AD_DB_PASS, host=SKOLE_AD_DB_HOST)
+db_client_meta = DatabaseClient(db_type="postgresql", database=SKOLE_AD_DB_NAME, username=SKOLE_AD_DB_USER, password=SKOLE_AD_DB_PASS, host=SKOLE_AD_DB_HOST)
+db_client_gis = DatabaseClient(db_type="postgresql", database=GIS_DB_NAME, username=GIS_DB_USER, password=GIS_DB_PASS, host=GIS_DB_HOST, port=GIS_DB_PORT)
 
 
 @api_endpoints.route('/skole-ad-file', methods=['GET', 'POST'])
@@ -43,7 +48,7 @@ def skole_ad_file():
         filename = file.filename
 
         try:
-            with db_client.get_connection() as conn:
+            with db_client_meta.get_connection() as conn:
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SKOLE_AD_DB_SCHEMA}"))
                 conn.commit()
                 file_ext = os.path.splitext(filename)[1].lower()
@@ -137,3 +142,31 @@ def add_user_to_group():
             logger.error(f"Failed to add user to group: {e}")
             error = str(e)
     return jsonify({"user_added": user_added, "message": message, "error": error}), 200
+
+
+@api_endpoints.route('/add-gis-raagereder-data-to-db', methods=['POST'])
+@ah.authorization
+def add_gis_raagereder_data_to_db():
+    data = request.get_json()
+    if not data or 'geojson' not in data:
+        return Response('Missing required key geojson', status=400)
+    try:
+        geojson = json.loads(data['geojson'])
+        with db_client_gis.get_connection() as conn:
+            id_sql = f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {GIS_DB_SCHEMA}.aktive_raagereder_rk_all"
+            result = conn.execute(text(id_sql))
+            next_id = result.scalar() if result else 1
+            for feature in geojson['features']:
+                geom_json = json.dumps(feature['geometry'])
+                sql = (
+                    f"INSERT INTO {GIS_DB_SCHEMA}.aktive_raagereder_rk_all (wkb_geometry, oprettet_dato, geojson, id) "
+                    f"VALUES (ST_SetSRID(ST_GeomFromGeoJSON('{geom_json}'), 25832), :oprettet_dato, :geojson, :id);"
+                )
+                oprettet_dato = datetime.now()
+                conn.execute(text(sql), {'oprettet_dato': oprettet_dato, 'geojson': geom_json, 'id': next_id})
+            conn.commit()
+            logger.info("GIS raagereder data added to database.")
+    except Exception as e:
+        logger.error(f"ERROR adding GIS raagereder data to database: {e}")
+        return Response('Failed to add GIS raagereder data to database', status=500)
+    return jsonify({"message": "GIS raagereder data modtaget"}), 200
