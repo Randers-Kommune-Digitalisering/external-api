@@ -152,6 +152,7 @@ def add_gis_raagereder_data_to_db():
         return Response('Missing required key geojson', status=400)
     try:
         geojson = json.loads(data['geojson'])
+        logger.info(f"Geo json:\n {geojson}")
         with db_client_gis.get_connection() as conn:
             id_sql = f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {GIS_DB_SCHEMA}.aktive_raagereder_rk_all"
             result = conn.execute(text(id_sql))
