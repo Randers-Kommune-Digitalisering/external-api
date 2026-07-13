@@ -122,12 +122,30 @@ jobs:
           set -euo pipefail
           rm -rf dev-configs
 
+      - name: Build add-paths list from changed files
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          files="$(git status --porcelain -uall | awk '{print $2}')"
+          if [[ -z "${files}" ]]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "has_changes=true"
+            echo "add_paths<<EOF"
+            printf '%s\n' "${files}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create pull request
+        if: steps.changed.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          add-paths: |
-            setup.cfg
-            .github
+          add-paths: ${{ steps.changed.outputs.add_paths }}
           commit-message: "chore: sync dev-configs"
           title: "chore: sync dev-configs"
           body: |
