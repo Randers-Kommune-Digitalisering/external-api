@@ -248,8 +248,9 @@ def post_form_data_to_nexus():
         client.create_assistive_device_communication_form(
             patient_data=patient_data,
             application_date=datetime.now().date(),
-            device=device_name,
             application_reason=reason_text,
+            communication_source="Pårørende" if on_behalf_of_relation else "Borger",
+            device=device_name,
             optional_contact_info=f"{on_behalf_of_relation}\n{on_behalf_of_name}\n{on_behalf_of_phone}" if on_behalf_of_relation or on_behalf_of_name or on_behalf_of_phone else None,
             patient_understands=not bool(on_behalf_of_relation),
             can_information_be_obtained=can_collect_data
