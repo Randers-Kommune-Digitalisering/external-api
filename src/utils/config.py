@@ -30,3 +30,12 @@ GIS_DB_HOST = os.environ["GIS_DB_HOST"].strip()
 GIS_DB_PORT = os.environ["GIS_DB_PORT"].strip()
 GIS_DB_NAME = os.environ["GIS_DB_NAME"].strip()
 GIS_DB_SCHEMA = "s34_xflow"
+
+NEXUS_URL = os.environ["NEXUS_URL"].strip()
+NEXUS_TOKEN_URL = os.environ["NEXUS_TOKEN_URL"].strip()
+NEXUS_CLIENT_ID = os.environ["NEXUS_CLIENT_ID"].strip()
+NEXUS_CLIENT_SECRET = os.environ["NEXUS_CLIENT_SECRET"].strip()
+
+NEXUS_FORMS = ("Personligt_hjaelpemiddel__Kopi__TEST",)
+
+XFLOW_API_KEY = os.environ["XFLOW_API_KEY"].strip()

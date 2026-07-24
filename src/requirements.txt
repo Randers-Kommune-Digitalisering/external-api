@@ -12,4 +12,5 @@ prometheus-client
 python-dotenv
 requests==2.31.0
 requests-pkcs12==1.24
+rk-digi==2.2.0
 SQLAlchemy

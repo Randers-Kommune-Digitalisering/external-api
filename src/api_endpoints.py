@@ -10,12 +10,15 @@ from urllib.parse import urlparse
 from sqlalchemy import text
 from flask import Blueprint, Response, request, jsonify
 
+from nexus.client import NexusClient
 from utils.openid_integration import AuthorizationHelper
 from utils.database import DatabaseClient
 from utils.token_provider import BearerAuth
+from utils.files import danish_to_ascii, decode_base64_file
 from utils.config import SKOLE_AD_DB_HOST, SKOLE_AD_DB_USER, SKOLE_AD_DB_PASS, SKOLE_AD_DB_NAME, SKOLE_AD_DB_SCHEMA, \
     KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE, KEYCLOAK_USER_ADMIN_CLIENT_ID, KEYCLOAK_USER_ADMIN_CLIENT_SECRET, \
-    GIS_DB_USER, GIS_DB_PASS, GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_SCHEMA
+    GIS_DB_USER, GIS_DB_PASS, GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_SCHEMA, NEXUS_FORMS, XFLOW_API_KEY, \
+    NEXUS_URL, NEXUS_TOKEN_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 
 
 logger = logging.getLogger(__name__)
@@ -174,14 +177,82 @@ def add_gis_raagereder_data_to_db():
 
 @api_endpoints.route('/nexus', methods=['POST'])
 @ah.authorization
-def handle_post():
-    # Log request details
-    print("Headers:", dict(request.headers))
-    print("Query params:", request.args.to_dict())
-    print("Body (raw):", request.get_data(as_text=True))
+def post_form_data_to_nexus():
+    if not request.is_json:
+        return Response('Request body must be JSON', status=400)
 
-    # If JSON, log parsed JSON too
-    if request.is_json:
-        print("JSON:", request.get_json())
+    data = request.get_json()
+    required_keys = {"cpr", "formName", "formData", "attachments"}
+    missing_keys = sorted(required_keys - set(data or {}))
+    if missing_keys:
+        return Response(f"Missing required keys: {', '.join(missing_keys)}", status=400)
 
-    return jsonify({"status": "ok"}), 200
+    # When xFlow attaches a 'blanket' to an email it replaces spaces with underscores and removes hyphens, as well as transforms Danish characters. So the pattern is matched here.
+    form_name = danish_to_ascii(data['formName'].replace(" ", "_").replace("-", ""))
+    if form_name not in NEXUS_FORMS:
+        return Response(f"Form name '{form_name}' is not allowed", status=400)
+
+    cpr = data["cpr"]
+
+    # TODO: Remove when going to PROD - for new ignore all requests except for the test CPR number
+    if cpr != "111131-1112":
+        return jsonify({"msg": "not adding to Nexus"}), 200
+
+    docs: list[dict] = []
+
+    request_file_bytes, request_mime_type = decode_base64_file(data["formData"])
+    request_file_name = f"{form_name}.pdf"
+    docs.append({
+        "file_name": request_file_name,
+        "file_bytes": request_file_bytes,
+        "mime_type": request_mime_type
+    })
+
+    if form_name == NEXUS_FORMS[0]:  # Personligt_hjaelpemiddel__Kopi__TEST
+        with requests.Session() as attachment_session:
+            attachment_session.headers.update({"publicApiToken": XFLOW_API_KEY})
+
+            for attachment in data["attachments"]:
+                attachment_file_name = attachment.get("title")
+                attachment_mime_type = attachment.get("mimeType")
+                attachment_response = attachment_session.get(attachment.get("url"))
+                attachment_response.raise_for_status()
+                attachment_file_bytes = attachment_response.content
+                docs.append({
+                    "file_name": attachment_file_name,
+                    "file_bytes": attachment_file_bytes,
+                    "mime_type": attachment_mime_type
+                })
+
+        can_collect_data: bool = data["canCollectData"] if isinstance(data["canCollectData"], bool) else False
+
+        on_behalf_of_relation = f"{data['text0']} - {data['text1']}" if data["text0"] and data["text1"] else data["text0"] or None
+        on_behalf_of_name = data["text2"] if data["text2"] else None
+        on_behalf_of_phone = data["text3"] if data["text3"] else None
+
+        device_name = data["text4"]
+        reason_text = "\n".join([
+            data["text5"],
+            data["text6"],
+            data["text7"],
+            data["text8"],
+            data["text9"]
+        ])
+
+        client = NexusClient(base_url=NEXUS_URL, token_url=NEXUS_TOKEN_URL, client_id=NEXUS_CLIENT_ID, client_secret=NEXUS_CLIENT_SECRET)
+        patient_data = client.get_patient_data(cpr=cpr)
+
+        for doc in docs:
+            client.upload_document(patient_data=patient_data, file_name=doc["file_name"], file_bytes=doc["file_bytes"], mime_type=doc["mime_type"])
+
+        client.create_assistive_device_communication_form(
+            patient_data=patient_data,
+            application_date=datetime.now().date(),
+            device=device_name,
+            application_reason=reason_text,
+            optional_contact_info=f"{on_behalf_of_relation}\n{on_behalf_of_name}\n{on_behalf_of_phone}" if on_behalf_of_relation or on_behalf_of_name or on_behalf_of_phone else None,
+            patient_understands=not bool(on_behalf_of_relation),
+            can_information_be_obtained=can_collect_data
+        )
+
+    return jsonify({"msg": "added to Nexus"}), 200
