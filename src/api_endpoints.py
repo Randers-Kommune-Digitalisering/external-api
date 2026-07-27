@@ -243,7 +243,7 @@ def post_form_data_to_nexus():
         patient_data = client.get_patient_data(cpr=cpr)
 
         for doc in docs:
-            client.upload_document(patient_data=patient_data, file_name=doc["file_name"], file_bytes=doc["file_bytes"], mime_type=doc["mime_type"])
+            client.add_assistive_device_document(patient_data=patient_data, file_name=doc["file_name"], file_bytes=doc["file_bytes"], mime_type=doc["mime_type"])
 
         client.create_assistive_device_communication_form(
             patient_data=patient_data,
