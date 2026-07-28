@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 
 from rkdigi import ManagedOAuth2Session
 
@@ -144,7 +145,9 @@ class NexusClient:
         for item in form.get("items", []):
             label = item.get("label")
             if label == APPLICATION_DATE_FIELD:
-                item["value"] = application_date.strftime("%Y-%m-%d")
+                # Nexus expects an ISO UTC timestamp string for date fields.
+                local_midnight = datetime.combine(application_date, time.min, tzinfo=ZoneInfo("Europe/Copenhagen"))
+                item["value"] = local_midnight.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
             elif label == APPLICATION_REASON_FIELD:
                 item["value"] = f"{device}\n{application_reason}"
             elif label == COMMUNICATION_SOURCE_FIELD:
