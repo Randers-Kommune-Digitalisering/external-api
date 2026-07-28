@@ -182,7 +182,7 @@ def post_form_data_to_nexus():
         return Response('Request body must be JSON', status=400)
 
     data = request.get_json()
-    required_keys = {"cpr", "formName", "formData", "attachments"}
+    required_keys = {"cpr", "formName", "formData", "attachments", "date"}
     missing_keys = sorted(required_keys - set(data or {}))
     if missing_keys:
         return Response(f"Missing required keys: {', '.join(missing_keys)}", status=400)
@@ -193,10 +193,17 @@ def post_form_data_to_nexus():
         return Response(f"Form name '{form_name}' is not allowed", status=400)
 
     cpr = data["cpr"]
+    try:
+        form_date = datetime.fromisoformat(data["date"].replace("Z", "+00:00")).date()
+    except (AttributeError, TypeError, ValueError):
+        return Response('Invalid date format; expected ISO 8601 date or datetime', status=400)
 
     # TODO: Remove when going to PROD - for new ignore all requests except for the test CPR number
     if cpr != "111131-1112":
         return jsonify({"msg": "not adding to Nexus"}), 200
+
+    client = NexusClient(base_url=NEXUS_URL, token_url=NEXUS_TOKEN_URL, client_id=NEXUS_CLIENT_ID, client_secret=NEXUS_CLIENT_SECRET)
+    patient_data = client.get_patient_data(cpr=cpr)
 
     docs: list[dict] = []
 
@@ -239,15 +246,12 @@ def post_form_data_to_nexus():
             data["text9"]
         ])
 
-        client = NexusClient(base_url=NEXUS_URL, token_url=NEXUS_TOKEN_URL, client_id=NEXUS_CLIENT_ID, client_secret=NEXUS_CLIENT_SECRET)
-        patient_data = client.get_patient_data(cpr=cpr)
-
         for doc in docs:
             client.add_assistive_device_document(patient_data=patient_data, file_name=doc["file_name"], file_bytes=doc["file_bytes"], mime_type=doc["mime_type"])
 
         client.create_assistive_device_communication_form(
             patient_data=patient_data,
-            application_date=datetime.now().date(),
+            application_date=form_date,
             application_reason=reason_text,
             communication_source="Pårørende" if on_behalf_of_relation else "Borger",
             device=device_name,

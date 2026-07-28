@@ -65,7 +65,10 @@ class NexusClient:
         """Get the patient data for a specific CPR number."""
         home = self._get()
         patient_search = self._follow(home, "patients", params={"query": cpr})
-        patient_data_search = self._follow(patient_search['pages'][0], "patientData")
+        pages = patient_search.get("pages", [])
+        if not pages:
+            raise ValueError("No patient data found for CPR")
+        patient_data_search = self._follow(pages[0], "patientData")
         if len(patient_data_search) != 1:
             raise ValueError(f"Expected exactly one patient data entry, but found {len(patient_data_search)}")
         return self._follow(patient_data_search[0], "self")
