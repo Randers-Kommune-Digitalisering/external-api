@@ -207,15 +207,21 @@ def post_form_data_to_nexus():
 
     docs: list[dict] = []
 
-    request_file_bytes, request_mime_type = decode_base64_file(data["formData"])
-    request_file_name = f"{form_name}.pdf"
-    docs.append({
-        "file_name": request_file_name,
-        "file_bytes": request_file_bytes,
-        "mime_type": request_mime_type
-    })
-
     if form_name == NEXUS_FORMS[0]:  # Personligt_hjaelpemiddel__Kopi__TEST
+        device_name = data["text0"]
+
+        form_doc_name = f"Ansøgning {device_name}" if device_name.replace(" ", "").strip() else "Ansøgning Personlig hjælpemiddel"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}" if device_name.replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+
+        request_file_bytes, request_mime_type = decode_base64_file(data["formData"])
+        request_file_name = f"{form_name}.pdf"
+        docs.append({
+            "name": form_doc_name,
+            "file_name": request_file_name,
+            "file_bytes": request_file_bytes,
+            "mime_type": request_mime_type
+        })
+
         with requests.Session() as attachment_session:
             attachment_session.headers.update({"publicApiToken": XFLOW_API_KEY})
 
@@ -226,37 +232,46 @@ def post_form_data_to_nexus():
                 attachment_response.raise_for_status()
                 attachment_file_bytes = attachment_response.content
                 docs.append({
+                    "name": attachment_doc_name,
                     "file_name": attachment_file_name,
                     "file_bytes": attachment_file_bytes,
                     "mime_type": attachment_mime_type
                 })
 
-        can_collect_data: bool = data["canCollectData"] if isinstance(data["canCollectData"], bool) else False
+        can_collect_data: bool = data.get("canCollectData", False) is True
 
-        on_behalf_of_relation = f"{data['text0']} - {data['text1']}" if data["text0"] and data["text1"] else data["text0"] or None
-        on_behalf_of_name = data["text2"] if data["text2"] else None
-        on_behalf_of_phone = data["text3"] if data["text3"] else None
+        for_another = data.get("forAnother", False)
 
-        device_name = data["text4"]
-        reason_text = "\n".join([
-            data["text5"],
-            data["text6"],
-            data["text7"],
-            data["text8"],
-            data["text9"]
-        ])
+        if for_another:
+            on_behalf_of_relation = "Pårørende" if any(value in (data.get("relation") or "").lower() for value in ("forælder", "barn")) else "Andre" if "anden relation" in (data.get("relation") or "").lower() else None
+            on_behalf_of_name = data["text1"] if data["text1"] else None
+            on_behalf_of_phone = data["text2"] if data["text2"] else None
+        else:
+            on_behalf_of_relation = None
+            on_behalf_of_name = None
+            on_behalf_of_phone = None
 
         for doc in docs:
-            client.add_assistive_device_document(patient_data=patient_data, file_name=doc["file_name"], file_bytes=doc["file_bytes"], mime_type=doc["mime_type"])
+            client.add_assistive_device_document(
+                patient_data=patient_data,
+                name=doc["name"],
+                file_name=doc["file_name"],
+                file_bytes=doc["file_bytes"],
+                mime_type=doc["mime_type"]
+            )
+
+        reason_text = f"{form_date.strftime("%d-%m-%Y")} - Ansøgning om {device_name}" if device_name.replace(" ", "").strip() else f"{form_date.strftime("%d-%m-%Y")} - Ansøgning om Personlig hjælpemiddel"
+        if len(docs) > 1:
+            reason_text += " med bilag"
 
         client.create_assistive_device_communication_form(
             patient_data=patient_data,
             application_date=form_date,
             application_reason=reason_text,
-            communication_source="Pårørende" if on_behalf_of_relation else "Borger",
+            communication_source="Borger" if not for_another else on_behalf_of_relation,
             device=device_name,
-            optional_contact_info=f"{on_behalf_of_relation}\n{on_behalf_of_name}\n{on_behalf_of_phone}" if on_behalf_of_relation or on_behalf_of_name or on_behalf_of_phone else None,
-            patient_understands=not bool(on_behalf_of_relation),
+            optional_contact_info=f"{on_behalf_of_relation}\n{on_behalf_of_name}\n{on_behalf_of_phone}" if for_another and on_behalf_of_relation else None,
+            patient_understands=True,
             can_information_be_obtained=can_collect_data
         )
 

@@ -74,23 +74,19 @@ class NexusClient:
             raise ValueError(f"Expected exactly one patient data entry, but found {len(patient_data_search)}")
         return self._follow(patient_data_search[0], "self")
 
-    def add_assistive_device_document(self, patient_data: dict, file_name: str, file_bytes: bytes, mime_type: str) -> bool:
+    def add_assistive_device_document(self, patient_data: dict, name: str, file_name: str, file_bytes: bytes, mime_type: str) -> bool:
         """Add a document to the assistive devices dashboard for a specific patient."""
         dashboard = self._get_patient_dashboard(patient_data, ASSISTIVE_DEVICES_DASHBOARD_NAME)
         widget = self._get_widget(dashboard, ASSISTIVE_DEVICES_DASHBOARD_DOCS_WIDGET_NAME)
         new_document = self._follow(widget["creatableObjects"], "documentPrototype")
+        new_document["name"] = name
         new_document["originalFileName"] = file_name
         created_document = self._follow(new_document, "create", method="post", json=new_document)
 
-        if mime_type != "application/pdf":
-            raise ValueError(f"Expected MIME type 'application/pdf', but got '{mime_type}'")
-
-        # Ensure the file name is valid and ends with .pdf (NOTE: no whitespaces)
+        # Ensure the file name is valid
         file_name = "_".join(file_name.strip().rstrip(".").split())
         if not file_name:
             raise ValueError("File name cannot be empty")
-        if not file_name.lower().endswith(".pdf"):
-            file_name = f"{file_name}.pdf"
 
         upload_res = self._follow(created_document, "upload", method="post", files={"file": (file_name, file_bytes, mime_type)})
         return upload_res.get("status", "").upper() == "UPLOADED"
