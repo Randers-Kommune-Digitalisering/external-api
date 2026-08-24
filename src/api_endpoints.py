@@ -260,7 +260,8 @@ def post_form_data_to_nexus():
                 mime_type=doc["mime_type"]
             )
 
-        reason_text = f"{form_date.strftime("%d-%m-%Y")} - Ansøgning om {device_name}" if device_name.replace(" ", "").strip() else f"{form_date.strftime("%d-%m-%Y")} - Ansøgning om Personlig hjælpemiddel"
+        formatted_form_date = form_date.strftime("%d-%m-%Y")
+        reason_text = f"{formatted_form_date} - Ansøgning om {device_name}" if device_name.replace(" ", "").strip() else f"{formatted_form_date} - Ansøgning om Personlig hjælpemiddel"
         if len(docs) > 1:
             reason_text += " med bilag"
 
