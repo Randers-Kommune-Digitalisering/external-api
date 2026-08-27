@@ -246,7 +246,7 @@ def post_form_data_to_nexus():
             on_behalf_of_relation = "Pårørende" if any(value in (data.get("relation") or "").lower() for value in ("forælder", "barn")) else "Andre" if "anden relation" in (data.get("relation") or "").lower() else None
             on_behalf_of_name = data["text1"] if data["text1"] else None
             on_behalf_of_phone = data["text2"] if data["text2"] else None
-            on_behalf_of_text = f"Borger er {data.get("relation").lower()}" if on_behalf_of_relation != "Andre" else f"{data.get('relation')} - {data.get('text3')}"
+            on_behalf_of_text = f"Borger er {(data.get('relation') or '').lower()}" if on_behalf_of_relation != "Andre" else f"{data.get('relation')} - {data.get('text3')}"
         else:
             on_behalf_of_relation = None
             on_behalf_of_name = None
