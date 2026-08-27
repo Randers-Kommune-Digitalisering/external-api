@@ -3,11 +3,12 @@ from zoneinfo import ZoneInfo
 
 from rkdigi import ManagedOAuth2Session
 
-# Elements in the Nexus API that are specific to the assistive devices dashboard and its widgets/forms.
+# Elements in the Nexus API that are specific to the assistive devices dashboard and its widgets/forms/assignments.
 ASSISTIVE_DEVICES_DASHBOARD_NAME = "Dokumentation - Personlige hjælpemidler"
 ASSISTIVE_DEVICES_DASHBOARD_DOCS_WIDGET_NAME = "Breve og dokumenter Personlige hjælpemidler"
 ASSISTIVE_DEVICES_DASHBOARD_COMMUNICATION_WIDGET_NAME = "Henvendelse Visitation Personlige hjælpemidler"
 ASSISTIVE_DEVICES_COMMUNICATION_FORM_TITLE = "Henvendelse Kropsbårne hjælpemidler"
+ASSISTIVE_DEVICES_ASSIGNMENT_NAME = "PHJÆ Nye ansøgninger fra X-Flow"
 
 
 class NexusClient:
@@ -111,6 +112,8 @@ class NexusClient:
         INFORMATION_OBTAINED_FIELD = "Der er givet tilladelse til indhentning af oplysninger"
         DEVICE = "Hvad søges der om?"
         CONTACT_INFO_FIELD = "Uddyb med navn, telefonnummer m.m."
+        # Action name
+        COMPLETED_ACTION_NAME = "Udfyldt"
 
         dashboard = self._get_patient_dashboard(patient_data, ASSISTIVE_DEVICES_DASHBOARD_NAME)
         widget = self._get_widget(dashboard, ASSISTIVE_DEVICES_DASHBOARD_COMMUNICATION_WIDGET_NAME)
@@ -164,9 +167,46 @@ class NexusClient:
                 item["value"] = optional_contact_info
 
         actions = self._follow(form, "availableActions")
-        action = next((a for a in actions if a.get("name") == "Udfyldt"), None)  # NOTE: Hardcoded action name
+        action = next((a for a in actions if a.get("name") == COMPLETED_ACTION_NAME), None)
         if action is None:
-            raise ValueError("Could not find action 'Udfyldt' in availableActions")
+            raise ValueError(f"Could not find action '{COMPLETED_ACTION_NAME}' in availableActions")
 
         created_form = self._follow(action, "createFormData", method="post", json=form)
         return created_form
+
+    def get_auto_assignment(self, form: dict, assignment_name: str) -> dict:
+        """Get the auto-assignment for a specific form and assignment name."""
+        activityIdentifier = form.get("activityIdentifier", {}).get("identifier")
+        state = form.get("workflowState", {}).get("name")
+        activity_type = form.get("activityIdentifier", {}).get("type")
+        form_definition_id = form.get("formDefinition", {}).get("id")
+
+        payload = {
+            "activities": [
+                {
+                    "activity": activityIdentifier,
+                    "groupKey": None,
+                    "params": [
+                        {"key": "state", "value": state},
+                        {"key": "activityType", "value": activity_type},
+                        {"key": "formDefinitionId", "value": form_definition_id},
+                    ],
+                }
+            ]
+        }
+
+        auto_assignments_res = self._follow(obj=form, rel="autoAssignmentsPrototype", method="post", json=payload)
+        assignments = auto_assignments_res.get("assignments", [])
+        selected_assignment = next((a for a in assignments if a.get("type", {}).get("name") == assignment_name), None)
+        if not selected_assignment:
+            raise ValueError(f"Could not find assignment with type name '{assignment_name}' in response")
+
+        return selected_assignment
+
+    def create_assigment(self, assignment: dict) -> dict:
+        """Create an assignment in Nexus."""
+        CREATE_ACTION_NAME = "Opret"
+        create_action = next((a for a in assignment.get("actions", []) if a.get("name") == CREATE_ACTION_NAME), None)
+        if not create_action:
+            raise ValueError(f"Could not find action '{CREATE_ACTION_NAME}' in assignment actions")
+        return self._follow(obj=create_action, rel="createAssignment", method="post", json=assignment)

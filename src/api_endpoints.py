@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from sqlalchemy import text
 from flask import Blueprint, Response, request, jsonify
 
-from nexus.client import NexusClient
+from nexus.client import NexusClient, ASSISTIVE_DEVICES_ASSIGNMENT_NAME
 from utils.openid_integration import AuthorizationHelper
 from utils.database import DatabaseClient
 from utils.token_provider import BearerAuth
@@ -261,13 +261,14 @@ def post_form_data_to_nexus():
                 mime_type=doc["mime_type"]
             )
 
+        renewal_or_new_text = data.get("text4")
         formatted_form_date = form_date.strftime("%d-%m-%Y")
         reason_text = f"{formatted_form_date} - Ansøgning om {device_name}" if device_name.replace(" ", "").strip() else f"{formatted_form_date} - Ansøgning om Personlig hjælpemiddel"
         if len(docs) > 1:
             reason_text += " med bilag"
-        reason_text += f" {data.get('text4', '')}"
+        reason_text += f" {renewal_or_new_text}"
 
-        client.create_assistive_device_communication_form(
+        created_form = client.create_assistive_device_communication_form(
             patient_data=patient_data,
             application_date=form_date,
             application_reason=reason_text,
@@ -277,5 +278,10 @@ def post_form_data_to_nexus():
             patient_understands=True,
             can_information_be_obtained=can_collect_data
         )
+
+        assignment = client.get_auto_assignment(form=created_form, assignment_name=ASSISTIVE_DEVICES_ASSIGNMENT_NAME)
+        assignment["title"] = f"Ansøgning {renewal_or_new_text}"
+
+        client.create_assignment(assignment=assignment)
 
     return jsonify({"msg": "added to Nexus"}), 200
