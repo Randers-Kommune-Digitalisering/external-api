@@ -203,7 +203,7 @@ class NexusClient:
 
         return selected_assignment
 
-    def create_assigment(self, assignment: dict) -> dict:
+    def create_assignment(self, assignment: dict) -> dict:
         """Create an assignment in Nexus."""
         CREATE_ACTION_NAME = "Opret"
         create_action = next((a for a in assignment.get("actions", []) if a.get("name") == CREATE_ACTION_NAME), None)
