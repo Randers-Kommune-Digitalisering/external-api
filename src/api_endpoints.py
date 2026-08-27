@@ -246,7 +246,7 @@ def post_form_data_to_nexus():
             on_behalf_of_relation = "Pårørende" if any(value in (data.get("relation") or "").lower() for value in ("forælder", "barn")) else "Andre" if "anden relation" in (data.get("relation") or "").lower() else None
             on_behalf_of_name = data["text1"] if data["text1"] else None
             on_behalf_of_phone = data["text2"] if data["text2"] else None
-            on_behalf_of_text = data.get("relation") if on_behalf_of_relation != "Andre" else f"{data.get('relation')} - {data.get('text3')}"
+            on_behalf_of_text = f"Borger er {data.get("relation").lower()}" if on_behalf_of_relation != "Andre" else f"{data.get('relation')} - {data.get('text3')}"
         else:
             on_behalf_of_relation = None
             on_behalf_of_name = None
@@ -274,7 +274,7 @@ def post_form_data_to_nexus():
             application_reason=reason_text,
             communication_source="Borger" if not for_another else on_behalf_of_relation,
             device=device_name,
-            optional_contact_info=f"Borger er {on_behalf_of_text.lower()}\n{on_behalf_of_name} - tlf: {on_behalf_of_phone}" if for_another and on_behalf_of_relation else None,
+            optional_contact_info=f"{on_behalf_of_text.lower()}\n{on_behalf_of_name} - tlf: {on_behalf_of_phone}" if for_another and on_behalf_of_relation else None,
             patient_understands=True,
             can_information_be_obtained=can_collect_data
         )
