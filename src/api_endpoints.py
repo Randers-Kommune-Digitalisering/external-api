@@ -274,13 +274,14 @@ def post_form_data_to_nexus():
             application_reason=reason_text,
             communication_source="Borger" if not for_another else on_behalf_of_relation,
             device=device_name,
-            optional_contact_info=f"{on_behalf_of_text}\n{on_behalf_of_name} - {on_behalf_of_phone}" if for_another and on_behalf_of_relation else None,
+            optional_contact_info=f"Borger er {on_behalf_of_text.lower()}\n{on_behalf_of_name} - tlf: {on_behalf_of_phone}" if for_another and on_behalf_of_relation else None,
             patient_understands=True,
             can_information_be_obtained=can_collect_data
         )
 
         assignment = client.get_auto_assignment(form=created_form, assignment_name=ASSISTIVE_DEVICES_ASSIGNMENT_NAME)
-        assignment["title"] = f"Ansøgning {renewal_or_new_text}"
+        assignment_title = device_name if device_name.replace(" ", "").strip() else "Personlig hjælpemiddel"
+        assignment["title"] = f"{assignment_title} {renewal_or_new_text}"
 
         client.create_assignment(assignment=assignment)
 

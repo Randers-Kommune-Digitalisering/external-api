@@ -148,7 +148,7 @@ class NexusClient:
                 local_midnight = datetime.combine(application_date, time.min, tzinfo=ZoneInfo("Europe/Copenhagen"))
                 item["value"] = local_midnight.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
             elif label == APPLICATION_REASON_FIELD:
-                item["value"] = f"{device}\n{application_reason}"
+                item["value"] = application_reason
             elif label == COMMUNICATION_SOURCE_FIELD:
                 item["value"] = _get_dropdown_value_or_raise(item, communication_source)
             elif label == PATIENT_UNDERSTANDS_FIELD:
