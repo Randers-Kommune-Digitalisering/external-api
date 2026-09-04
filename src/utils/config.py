@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-DEBUG = os.getenv('DEBUG', 'False') in ['True', 'true']
-PORT = os.getenv('PORT', '8080')
-POD_NAME = os.getenv('POD_NAME', 'pod_name_not_set')
+DEBUG = os.getenv("DEBUG", "False").strip().lower() in ["true", "1", "t", "y", "yes"]
+PORT = os.getenv("PORT", "8080")
+POD_NAME = os.getenv("POD_NAME", "pod_name_not_set")
 
 KEYCLOAK_URL = os.environ["KEYCLOAK_URL"].strip()
 KEYCLOAK_REALM = os.environ["KEYCLOAK_REALM"].strip()
@@ -30,3 +30,12 @@ GIS_DB_HOST = os.environ["GIS_DB_HOST"].strip()
 GIS_DB_PORT = os.environ["GIS_DB_PORT"].strip()
 GIS_DB_NAME = os.environ["GIS_DB_NAME"].strip()
 GIS_DB_SCHEMA = "s34_xflow"
+
+NEXUS_URL = os.environ["NEXUS_URL"].strip()
+NEXUS_TOKEN_URL = os.environ["NEXUS_TOKEN_URL"].strip()
+NEXUS_CLIENT_ID = os.environ["NEXUS_CLIENT_ID"].strip()
+NEXUS_CLIENT_SECRET = os.environ["NEXUS_CLIENT_SECRET"].strip()
+
+NEXUS_FORMS = ("Personligt_hjaelpemiddel__Kopi__TEST",)
+
+XFLOW_API_KEY = os.environ["XFLOW_API_KEY"].strip()

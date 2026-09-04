@@ -10,12 +10,15 @@ from urllib.parse import urlparse
 from sqlalchemy import text
 from flask import Blueprint, Response, request, jsonify
 
+from nexus.client import NexusClient, ASSISTIVE_DEVICES_ASSIGNMENT_NAME
 from utils.openid_integration import AuthorizationHelper
 from utils.database import DatabaseClient
 from utils.token_provider import BearerAuth
+from utils.files import danish_to_ascii, decode_base64_file
 from utils.config import SKOLE_AD_DB_HOST, SKOLE_AD_DB_USER, SKOLE_AD_DB_PASS, SKOLE_AD_DB_NAME, SKOLE_AD_DB_SCHEMA, \
     KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE, KEYCLOAK_USER_ADMIN_CLIENT_ID, KEYCLOAK_USER_ADMIN_CLIENT_SECRET, \
-    GIS_DB_USER, GIS_DB_PASS, GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_SCHEMA
+    GIS_DB_USER, GIS_DB_PASS, GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_SCHEMA, NEXUS_FORMS, XFLOW_API_KEY, \
+    NEXUS_URL, NEXUS_TOKEN_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 
 
 logger = logging.getLogger(__name__)
@@ -170,3 +173,112 @@ def add_gis_raagereder_data_to_db():
         logger.error(f"ERROR adding GIS raagereder data to database: {e}")
         return Response('Failed to add GIS raagereder data to database', status=500)
     return jsonify({"message": "GIS raagereder data modtaget"}), 200
+
+
+@api_endpoints.route('/nexus', methods=['POST'])
+@ah.authorization
+def post_form_data_to_nexus():
+    if not request.is_json:
+        return Response('Request body must be JSON', status=400)
+
+    data = request.get_json()
+    required_keys = {"cpr", "formName", "formData", "attachments", "date"}
+    missing_keys = sorted(required_keys - set(data or {}))
+    if missing_keys:
+        return Response(f"Missing required keys: {', '.join(missing_keys)}", status=400)
+
+    # When xFlow attaches a 'blanket' to an email it replaces spaces with underscores and removes hyphens, as well as transforms Danish characters. So the pattern is matched here.
+    form_name = danish_to_ascii(data['formName'].replace(" ", "_").replace("-", ""))
+    if form_name not in NEXUS_FORMS:
+        return Response(f"Form name '{form_name}' is not allowed", status=400)
+
+    cpr = data["cpr"]
+    try:
+        form_date = datetime.fromisoformat(data["date"].replace("Z", "+00:00")).date()
+    except (AttributeError, TypeError, ValueError):
+        return Response('Invalid date format; expected ISO 8601 date or datetime', status=400)
+
+    client = NexusClient(base_url=NEXUS_URL, token_url=NEXUS_TOKEN_URL, client_id=NEXUS_CLIENT_ID, client_secret=NEXUS_CLIENT_SECRET)
+    patient_data = client.get_patient_data(cpr=cpr)
+
+    docs: list[dict] = []
+
+    if form_name == NEXUS_FORMS[0]:  # Personligt_hjaelpemiddel__Kopi__TEST
+        device_name = data["text0"]
+
+        form_doc_name = f"Ansøgning {device_name}" if device_name.replace(" ", "").strip() else "Ansøgning Personlig hjælpemiddel"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}" if device_name.replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+
+        request_file_bytes, request_mime_type = decode_base64_file(data["formData"])
+        request_file_name = f"{form_name}.pdf"
+        docs.append({
+            "name": form_doc_name,
+            "file_name": request_file_name,
+            "file_bytes": request_file_bytes,
+            "mime_type": request_mime_type
+        })
+
+        with requests.Session() as attachment_session:
+            attachment_session.headers.update({"publicApiToken": XFLOW_API_KEY})
+
+            for attachment in data["attachments"]:
+                attachment_file_name = attachment.get("title")
+                attachment_mime_type = attachment.get("mimeType")
+                attachment_response = attachment_session.get(attachment.get("url"))
+                attachment_response.raise_for_status()
+                attachment_file_bytes = attachment_response.content
+                docs.append({
+                    "name": attachment_doc_name,
+                    "file_name": attachment_file_name,
+                    "file_bytes": attachment_file_bytes,
+                    "mime_type": attachment_mime_type
+                })
+
+        can_collect_data: bool = data.get("canCollectData", False) is True
+
+        for_another = data.get("forAnother", False)
+
+        if for_another:
+            on_behalf_of_relation = "Pårørende" if any(value in (data.get("relation") or "").lower() for value in ("forælder", "barn")) else "Andre" if "anden relation" in (data.get("relation") or "").lower() else None
+            on_behalf_of_name = data["text1"] if data["text1"] else None
+            on_behalf_of_phone = data["text2"] if data["text2"] else None
+            on_behalf_of_text = f"Borger er {(data.get('relation') or '').lower()}" if on_behalf_of_relation != "Andre" else f"{data.get('relation')} - {data.get('text3')}"
+        else:
+            on_behalf_of_relation = None
+            on_behalf_of_name = None
+            on_behalf_of_phone = None
+
+        for doc in docs:
+            client.add_assistive_device_document(
+                patient_data=patient_data,
+                name=doc["name"],
+                file_name=doc["file_name"],
+                file_bytes=doc["file_bytes"],
+                mime_type=doc["mime_type"]
+            )
+
+        renewal_or_new_text = data.get("text4")
+        formatted_form_date = form_date.strftime("%d-%m-%Y")
+        reason_text = f"{formatted_form_date} - Ansøgning om {device_name}" if device_name.replace(" ", "").strip() else f"{formatted_form_date} - Ansøgning om Personlig hjælpemiddel"
+        if len(docs) > 1:
+            reason_text += " med bilag"
+        reason_text += f" {renewal_or_new_text}"
+
+        created_form = client.create_assistive_device_communication_form(
+            patient_data=patient_data,
+            application_date=form_date,
+            application_reason=reason_text,
+            communication_source="Borger" if not for_another else on_behalf_of_relation,
+            device=device_name,
+            optional_contact_info=f"{on_behalf_of_text.lower()}\n{on_behalf_of_name} - tlf: {on_behalf_of_phone}" if for_another and on_behalf_of_relation else None,
+            patient_understands=True,
+            can_information_be_obtained=can_collect_data
+        )
+
+        assignment = client.get_auto_assignment(form=created_form, assignment_name=ASSISTIVE_DEVICES_ASSIGNMENT_NAME)
+        assignment_title = device_name if device_name.replace(" ", "").strip() else "Personlig hjælpemiddel"
+        assignment["title"] = f"{assignment_title} {renewal_or_new_text}"
+
+        client.create_assignment(assignment=assignment)
+
+    return jsonify({"msg": "added to Nexus"}), 200
