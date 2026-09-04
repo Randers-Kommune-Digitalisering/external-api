@@ -198,10 +198,6 @@ def post_form_data_to_nexus():
     except (AttributeError, TypeError, ValueError):
         return Response('Invalid date format; expected ISO 8601 date or datetime', status=400)
 
-    # TODO: Remove when going to PROD - for new ignore all requests except for the test CPR number
-    if cpr != "111131-1112":
-        return jsonify({"msg": "not adding to Nexus"}), 200
-
     client = NexusClient(base_url=NEXUS_URL, token_url=NEXUS_TOKEN_URL, client_id=NEXUS_CLIENT_ID, client_secret=NEXUS_CLIENT_SECRET)
     patient_data = client.get_patient_data(cpr=cpr)
 
