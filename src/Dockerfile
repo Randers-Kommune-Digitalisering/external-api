@@ -1,4 +1,4 @@
-FROM python:3.10-alpine
+FROM python:3.13-alpine
 
 # Set dir and user
 ENV GROUP_NAME=app
@@ -13,7 +13,7 @@ RUN addgroup --gid $GROUP_ID $GROUP_NAME && \
 
 # Install packages
 RUN apk update
-RUN apk add musl-dev gcc libpq-dev mariadb-connector-c-dev postgresql-dev python3-dev
+RUN apk add --no-cache build-base postgresql-dev freetds-dev
 
 # Copy files and set working dir
 COPY . $HOME
@@ -32,5 +32,4 @@ EXPOSE $PORT
 # Set user
 USER $USER_ID
 
-ENTRYPOINT ["python"]
-CMD ["main.py"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} main:app"]

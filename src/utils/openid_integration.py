@@ -6,6 +6,7 @@ from cryptography.hazmat.primitives import serialization
 from flask import Response, request
 from base64 import b64decode
 
+from utils.config import KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ class AuthorizationHelper:
     def __init__(self, keycloak_url, realm, audience):
         self.algorithms = ["RS256"]
         self.audience = audience
-        self.url = f"{keycloak_url}auth/realms/{realm}/"
+        self.url = f"{keycloak_url.rstrip('/')}/auth/realms/{realm}/"
         self.public_key = self.get_public_key()
 
     def get_public_key(self):
@@ -64,3 +65,6 @@ class AuthorizationHelper:
                 logger.error(e)
                 return Response(status=401, response=str(e))
         return decorated_function
+
+
+authorization_helper = AuthorizationHelper(KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_AUDIENCE)
