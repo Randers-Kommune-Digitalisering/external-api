@@ -75,4 +75,5 @@ def personligt_hjaelpemiddel(data: dict) -> bool:
 
 HJAELPEMIDDEL_HANDLERS = {
     "personligt_hjaelpemiddel": personligt_hjaelpemiddel,
+    "personligt_hjaelpemiddel__kopi__test": personligt_hjaelpemiddel  # Test form for testing purposes, should be removed in production
 }
