@@ -3,7 +3,7 @@ from flask import Response, request, Blueprint
 from datetime import datetime
 from utils.openid_integration import authorization_helper
 from handlers.nexus import HJAELPEMIDDEL_HANDLERS
-from src.utils.utils import danish_to_ascii
+from utils.utils import danish_to_ascii
 
 logger = logging.getLogger(__name__)
 nexus_bp = Blueprint('nexus', __name__, url_prefix='/nexus')
