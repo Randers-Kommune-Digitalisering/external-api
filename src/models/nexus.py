@@ -16,8 +16,8 @@ class HjaelpemiddelStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class PersonligtHjaelpemiddel(db.Model):
-    __tablename__ = "personligt_hjaelpemiddel"
+class HjaelpemiddelBase(db.Model):
+    __abstract__ = True
     __table_args__ = {"schema": XFLOW_NEXUS_HJAELPEMIDDEL_DB_TABLE}
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -43,3 +43,11 @@ class PersonligtHjaelpemiddel(db.Model):
     on_behalf_of_name: Mapped[str] = mapped_column(String(255), nullable=True)
     on_behalf_of_phone: Mapped[str] = mapped_column(String(255), nullable=True)
     on_behalf_of_text: Mapped[str] = mapped_column(String(255), nullable=True)
+
+
+class PersonligtHjaelpemiddel(HjaelpemiddelBase):
+    __tablename__ = "personligt_hjaelpemiddel"
+
+
+class Staastoettestol(HjaelpemiddelBase):
+    __tablename__ = "staastoettestol"
