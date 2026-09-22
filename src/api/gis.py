@@ -17,7 +17,9 @@ gis_bp = Blueprint("gis", __name__, url_prefix="/gis")
 @authorization_helper.authorization
 def raagereder():
     try:
+        logger.info(request)
         data = request.get_json()
+        logger.info(data)
     except Exception:
         return Response('Invalid JSON payload', status=400)
 
