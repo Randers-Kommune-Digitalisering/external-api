@@ -26,6 +26,7 @@ def raagereder():
 
     try:
         geojson = data['geojson']
+        logger.info(geojson)
         if isinstance(geojson, str):
             try:
                 json.loads(geojson)
