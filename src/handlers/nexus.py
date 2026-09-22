@@ -3,7 +3,9 @@ import logging
 from datetime import datetime
 
 from extensions import db
-from models.nexus import PersonligtHjaelpemiddel, Staastoettestol
+from models.nexus import (
+    Elscooter, PersonligtHjaelpemiddel, Staastoettestol, Servicehund
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +86,20 @@ def personligt_hjaelpemiddel(data: dict) -> bool:
     return True
 
 
-def staastoettestol(data: dict) -> bool:
+def sel_112_113_113b_116(data: dict) -> bool:
     try:
         common_form_data = _prepare_common_form_data(data)
+        form_name = data["formName"].removesuffix("__kopi__test")
+        form_model = {
+            "staastoettestol": Staastoettestol,
+            "elscooter": Elscooter,
+            "servicehund": Servicehund,
+        }.get(form_name)
+        if form_model is None:
+            raise ValueError(f"Unsupported form name: {form_name}")
 
-        device_name = data["text0"] if (data["text0"] or "").replace(" ", "").strip() else "Ståstøttestol"
+        default_device_name = "Elscooter" if form_name == "elscooter" else "Ståstøttestol"
+        device_name = data["text0"] if (data["text0"] or "").replace(" ", "").strip() else default_device_name
 
         form_doc_name = f"Ansøgning {device_name}"
         attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
@@ -96,7 +107,7 @@ def staastoettestol(data: dict) -> bool:
         renewal_or_new_text = data.get("text4")
         reason_text = data.get("text5")
 
-        staastoettestol = Staastoettestol(
+        form = form_model(
             form_doc_name=form_doc_name,
             attachment_doc_name=attachment_doc_name,
             device_name=device_name,
@@ -105,14 +116,68 @@ def staastoettestol(data: dict) -> bool:
             **common_form_data,
         )
     except Exception:
-        logger.exception("Failed to prepare standing support chair form")
+        logger.exception(f"Failed to prepare {form_name} form")
         return False
 
     try:
-        db.session.add(staastoettestol)
+        db.session.add(form)
         db.session.commit()
     except Exception:
-        logger.exception("Failed to save standing support chair form")
+        logger.exception(f"Failed to save {form_name} form")
+        db.session.rollback()
+        return False
+    return True
+
+
+def sel_114(data: dict) -> bool:
+    try:
+        common_form_data = _prepare_common_form_data(data)
+        form_name = data["formName"].removesuffix("__kopi__test")
+        form_model = {
+            "staastoettestol": Staastoettestol,
+            "elscooter": Elscooter,
+            "servicehund": Servicehund,
+        }.get(form_name)
+        if form_model is None:
+            raise ValueError(f"Unsupported form name: {form_name}")
+
+        device_name = data.get("text0")
+
+        form_doc_name = f"Ansøgning {device_name}"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+
+        renewal_or_new_text = data.get("text4")
+        reason_text = data.get("text5")
+        type1 = (data.get("text6") or "").strip()
+        type2 = (data.get("text7") or "").strip()
+
+        if type1 and type2:
+            type_text = "§ 114 trivsel"
+        elif type1:
+            type_text = type1
+        elif type2:
+            type_text = type2
+        else:
+            raise ValueError("At least one of type1 or type2 must be provided")
+
+        form = form_model(
+            form_doc_name=form_doc_name,
+            attachment_doc_name=attachment_doc_name,
+            device_name=device_name,
+            reason_text=reason_text,
+            type_text=type_text,
+            renewal_or_new_text=renewal_or_new_text or "",
+            **common_form_data,
+        )
+    except Exception:
+        logger.exception(f"Failed to prepare {form_name} form")
+        return False
+
+    try:
+        db.session.add(form)
+        db.session.commit()
+    except Exception:
+        logger.exception(f"Failed to save {form_name} form")
         db.session.rollback()
         return False
     return True
@@ -120,7 +185,21 @@ def staastoettestol(data: dict) -> bool:
 
 HJAELPEMIDDEL_HANDLERS = {
     "personligt_hjaelpemiddel": personligt_hjaelpemiddel,
-    "staastoettestol": staastoettestol,
+    "staastoettestol": sel_112_113_113b_116,
+    "elscooter": sel_112_113_113b_116,
+    "servicehund": sel_112_113_113b_116,
+    "kommunikationshjaelpemiddel": sel_112_113_113b_116,
+    "hjaelpemiddel_andre_typer_af_hjaelpemidler": sel_112_113_113b_116,
+    "stoette_til_bil": sel_114,
+    "saerlig_indretning_af_bil_koerekort": sel_114,
+    "boligindretning": sel_112_113_113b_116,
     "personligt_hjaelpemiddel__kopi__test": personligt_hjaelpemiddel,  # Test form for testing purposes, should be removed in production
-    "staastoettestol__kopi__test": staastoettestol,  # Test form for testing purposes, should be removed in production
+    "staastoettestol__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
+    "elscooter__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
+    "servicehund__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
+    "kommunikationshjaelpemiddel__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
+    "hjaelpemiddel_andre_typer_af_hjaelpemidler__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
+    "stoette_til_bil__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
+    "saerlig_indretning_af_bil_koerekort__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
+    "boligindretning__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
 }

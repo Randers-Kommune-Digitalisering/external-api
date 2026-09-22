@@ -51,3 +51,33 @@ class PersonligtHjaelpemiddel(HjaelpemiddelBase):
 
 class Staastoettestol(HjaelpemiddelBase):
     __tablename__ = "staastoettestol"
+
+
+class Elscooter(HjaelpemiddelBase):
+    __tablename__ = "elscooter"
+
+
+class Servicehund(HjaelpemiddelBase):
+    __tablename__ = "servicehund"
+
+
+class Kommunikationshjaelpemiddel(HjaelpemiddelBase):
+    __tablename__ = "kommunikationshjaelpemiddel"
+
+
+class HjaelpemiddelAndreTyperAfHjaelpemidler(HjaelpemiddelBase):
+    __tablename__ = "hjaelpemiddel_andre_typer_af_hjaelpemidler"
+
+
+class StoetteTilBil(HjaelpemiddelBase):
+    __tablename__ = "stoette_til_bil"
+    type_text: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class SaerligIndretningAfBilKoerekort(HjaelpemiddelBase):
+    __tablename__ = "saerlig_indretning_af_bil_koerekort"
+    type_text: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class Boligindretning(HjaelpemiddelBase):
+    __tablename__ = "boligindretning"
