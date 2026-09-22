@@ -16,13 +16,23 @@ gis_bp = Blueprint("gis", __name__, url_prefix="/gis")
 @gis_bp.post("/raagereder")
 @authorization_helper.authorization
 def raagereder():
-    data = request.get_json()
+    try:
+        data = request.get_json()
+    except Exception:
+        return Response('Invalid JSON payload', status=400)
+
     if not data or 'geojson' not in data:
         return Response('Missing required key geojson', status=400)
+
     try:
         geojson = data['geojson']
         if isinstance(geojson, str):
-            geojson = json.loads(geojson)
+            try:
+                json.loads(geojson)
+            except json.JSONDecodeError:
+                return Response('Invalid geojson JSON', status=400)
+        elif not isinstance(geojson, dict):
+            return Response('Invalid geojson JSON', status=400)
 
         gis_engine = db.engines['gis']
 
