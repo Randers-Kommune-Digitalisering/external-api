@@ -28,16 +28,18 @@ def raagereder():
 
     try:
         geojson = data['geojson']
-        logger.info(geojson)
         if isinstance(geojson, str):
             try:
-                json.loads(geojson)
+                geojson = json.loads(geojson)
             except json.JSONDecodeError:
                 return Response('Invalid geojson JSON', status=400)
-        elif not isinstance(geojson, dict):
+
+        if not isinstance(geojson, dict) or 'features' not in geojson or not isinstance(geojson['features'], list):
             return Response('Invalid geojson JSON', status=400)
 
         gis_engine = db.engines['gis']
+
+        logger.info(geojson)
 
         with gis_engine.begin() as conn:
             id_sql = f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {GIS_DB_SCHEMA}.aktive_raagereder_rk_all"
