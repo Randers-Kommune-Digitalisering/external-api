@@ -17,9 +17,7 @@ gis_bp = Blueprint("gis", __name__, url_prefix="/gis")
 @authorization_helper.authorization
 def raagereder():
     try:
-        logger.info(request)
         data = request.get_json()
-        logger.info(data)
     except Exception:
         return Response('Invalid JSON payload', status=400)
 
@@ -38,8 +36,6 @@ def raagereder():
             return Response('Invalid geojson JSON', status=400)
 
         gis_engine = db.engines['gis']
-
-        logger.info(geojson)
 
         with gis_engine.begin() as conn:
             id_sql = f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {GIS_DB_SCHEMA}.aktive_raagereder_rk_all"
