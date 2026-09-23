@@ -74,7 +74,7 @@ def personligt_hjaelpemiddel(data: dict) -> bool:
         renewal_or_new_text = data.get("text4")
         formatted_form_date = common_form_data["form_date"].strftime("%d-%m-%Y")
         reason_text = f"{formatted_form_date} - Digital ansøgning om {device_name}" if (device_name or "").replace(" ", "").strip() else f"{formatted_form_date} - Ansøgning om Personlig hjælpemiddel"
-        if len(common_form_data["attachments"]) > 1:
+        if len(common_form_data["attachments"]) > 0:
             reason_text += " med bilag"
         reason_text += f" {renewal_or_new_text}"
 
