@@ -4,10 +4,21 @@ from datetime import datetime
 
 from extensions import db
 from models.nexus import (
-    Elscooter, PersonligtHjaelpemiddel, Staastoettestol, Servicehund
+    Elscooter,
+    PersonligtHjaelpemiddel,
+    SaerligIndretningAfBilKoerekort,
+    Servicehund,
+    Staastoettestol,
+    StoetteTilBil,
+    Boligindretning
 )
+from utils.utils import danish_to_ascii
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_form_name(form_name: str) -> str:
+    return danish_to_ascii(form_name.replace(" ", "_").replace("-", "")).lower().removesuffix("__kopi__test")
 
 
 def _prepare_common_form_data(data: dict) -> dict:
@@ -89,11 +100,12 @@ def personligt_hjaelpemiddel(data: dict) -> bool:
 def sel_112_113_113b_116(data: dict) -> bool:
     try:
         common_form_data = _prepare_common_form_data(data)
-        form_name = data["formName"].removesuffix("__kopi__test")
+        form_name = _normalize_form_name(data["formName"])
         form_model = {
             "staastoettestol": Staastoettestol,
             "elscooter": Elscooter,
             "servicehund": Servicehund,
+            "boligindretning": Boligindretning,
         }.get(form_name)
         if form_model is None:
             raise ValueError(f"Unsupported form name: {form_name}")
@@ -132,11 +144,10 @@ def sel_112_113_113b_116(data: dict) -> bool:
 def sel_114(data: dict) -> bool:
     try:
         common_form_data = _prepare_common_form_data(data)
-        form_name = data["formName"].removesuffix("__kopi__test")
+        form_name = _normalize_form_name(data["formName"])
         form_model = {
-            "staastoettestol": Staastoettestol,
-            "elscooter": Elscooter,
-            "servicehund": Servicehund,
+            "stoette_til_bil": StoetteTilBil,
+            "saerlig_indretning_af_bil_koerekort": SaerligIndretningAfBilKoerekort,
         }.get(form_name)
         if form_model is None:
             raise ValueError(f"Unsupported form name: {form_name}")
