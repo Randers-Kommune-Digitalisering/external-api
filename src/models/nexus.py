@@ -69,6 +69,10 @@ class HjaelpemiddelAndreTyperAfHjaelpemidler(HjaelpemiddelBase):
     __tablename__ = "hjaelpemiddel_andre_typer_af_hjaelpemidler"
 
 
+class HjaelpemiddelTilBarn(HjaelpemiddelBase):
+    __tablename__ = "hjaelpemiddel_til_barn"
+
+
 class StoetteTilBil(HjaelpemiddelBase):
     __tablename__ = "stoette_til_bil"
     type_text: Mapped[str] = mapped_column(String(255), nullable=False)

@@ -4,12 +4,15 @@ from datetime import datetime
 
 from extensions import db
 from models.nexus import (
-    Elscooter,
     PersonligtHjaelpemiddel,
-    SaerligIndretningAfBilKoerekort,
-    Servicehund,
     Staastoettestol,
+    Elscooter,
+    Servicehund,
+    Kommunikationshjaelpemiddel,
+    HjaelpemiddelAndreTyperAfHjaelpemidler,
+    HjaelpemiddelTilBarn,
     StoetteTilBil,
+    SaerligIndretningAfBilKoerekort,
     Boligindretning
 )
 from utils.utils import danish_to_ascii
@@ -105,6 +108,8 @@ def sel_112_113_113b_116(data: dict) -> bool:
             "staastoettestol": Staastoettestol,
             "elscooter": Elscooter,
             "servicehund": Servicehund,
+            "kommunikationshjaelpemiddel": Kommunikationshjaelpemiddel,
+            "hjaelpemiddel_andre_typer_af_hjaelpemidler": HjaelpemiddelAndreTyperAfHjaelpemidler,
             "boligindretning": Boligindretning,
         }.get(form_name)
         if form_model is None:
@@ -194,6 +199,79 @@ def sel_114(data: dict) -> bool:
     return True
 
 
+def hjaelpemiddel_barn(data: dict) -> bool:
+    form_name = _normalize_form_name(data["formName"])
+    form_model = {
+        "hjaelpemiddel_til_barn": HjaelpemiddelTilBarn,
+    }.get(form_name)
+
+    if not form_model:
+        logger.error(f"Form model for '{form_name}' not found")
+        return False
+
+    cpr = data.get("cpr")
+    form_date = datetime.fromisoformat(data["date"].replace("Z", "+00:00")).date()
+    form_doc_name = f"Ansøgning {data.get('formName')}"
+    attachment_doc_name = f"Ansøgning {data.get('formName')} Bilag"
+    form_pdf_base64 = data["formData"]
+    attachments = data["attachments"]
+
+    for_another = data.get("forAnother", True) or True
+
+    can_collect_data: bool = data.get("canCollectData", False) is True
+    device_name = data.get("text0") or "Hjælpemiddel til barn"
+    reason_text = data.get("text5") or "Digital ansøgning hjælpemiddel til barn"
+
+    relation = data.get("relation") or ""
+    on_behalf_of_relation = "Pårørende" if any(value in relation.lower() for value in ("forælder", "forældre")) else "Andre"
+
+    on_behalf_of_name_1 = data.get("text1")
+    on_behalf_of_phone_1 = data.get("text2")
+
+    on_behalf_of_name_2 = data.get("text3")
+    on_behalf_of_phone_2 = data.get("text4")
+
+    who = data.get("text6")
+
+    on_behalf_of_text = (
+        f"{who}\n {on_behalf_of_name_1}\n {on_behalf_of_phone_1}" if who
+        else f"Forældre\n {on_behalf_of_name_1}\n {on_behalf_of_phone_1}\n\n{on_behalf_of_name_2}\n {on_behalf_of_phone_2}" if all([on_behalf_of_name_1, on_behalf_of_phone_1, on_behalf_of_name_2, on_behalf_of_phone_2])
+        else f"Forælder\n {on_behalf_of_name_1}\n {on_behalf_of_phone_1}"
+    )
+
+    try:
+        form = form_model(
+            cpr=cpr,
+            form_date=form_date,
+            form_doc_name=form_doc_name,
+            form_pdf_base64=form_pdf_base64,
+            attachment_doc_name=attachment_doc_name,
+            attachments=attachments,
+            device_name=device_name,
+            can_collect_data=can_collect_data,
+            for_another=for_another,
+            reason_text=reason_text,
+            renewal_or_new_text="",
+            on_behalf_of_relation=on_behalf_of_relation,
+            on_behalf_of_name=on_behalf_of_name_1,
+            on_behalf_of_phone=on_behalf_of_phone_1,
+            on_behalf_of_text=on_behalf_of_text,
+
+        )
+    except Exception:
+        logger.exception(f"Failed to prepare {form_name} form")
+        return False
+
+    try:
+        db.session.add(form)
+        db.session.commit()
+    except Exception:
+        logger.exception(f"Failed to save {form_name} form")
+        db.session.rollback()
+        return False
+    return True
+
+
 HJAELPEMIDDEL_HANDLERS = {
     "personligt_hjaelpemiddel": personligt_hjaelpemiddel,
     "staastoettestol": sel_112_113_113b_116,
@@ -201,6 +279,7 @@ HJAELPEMIDDEL_HANDLERS = {
     "servicehund": sel_112_113_113b_116,
     "kommunikationshjaelpemiddel": sel_112_113_113b_116,
     "hjaelpemiddel_andre_typer_af_hjaelpemidler": sel_112_113_113b_116,
+    "hjaelpemiddel_til_barn": hjaelpemiddel_barn,
     "stoette_til_bil": sel_114,
     "saerlig_indretning_af_bil_koerekort": sel_114,
     "boligindretning": sel_112_113_113b_116,
@@ -211,6 +290,7 @@ HJAELPEMIDDEL_HANDLERS = {
     "kommunikationshjaelpemiddel__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "hjaelpemiddel_andre_typer_af_hjaelpemidler__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "stoette_til_bil__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
+    "hjaelpemiddel_til_barn__kopi__test": hjaelpemiddel_barn,  # Test form for testing purposes, should be removed in production
     "saerlig_indretning_af_bil_koerekort__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
     "boligindretning__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
 }
