@@ -28,6 +28,12 @@ def post_hjaelpemiddel_to_db():
 
     # When xFlow attaches a 'blanket' to an email it replaces spaces with underscores and removes hyphens, as well as transforms Danish characters. So the pattern is matched here.
     form_name = danish_to_ascii(data['formName'].replace(" ", "_").replace("-", "")).lower()
+
+    # NOTE: for testing - TODO: remove
+    if "kopi" in form_name and "test" in form_name:
+        if data.get("cpr") != "111131-1112":
+            return Response("Invalid CPR for test copy", status=400)
+
     if form_name not in HJAELPEMIDDEL_HANDLERS:
         return Response(f"Form name '{form_name}' is not allowed", status=400)
     else:
