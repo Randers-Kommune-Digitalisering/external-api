@@ -152,7 +152,7 @@ def sel_114(data: dict) -> bool:
         form_name = _normalize_form_name(data["formName"])
         form_model = {
             "stoette_til_bil": StoetteTilBil,
-            "saerlig_indretning_af_bil_koerekort": SaerligIndretningAfBilKoerekort,
+            "saerlig_indretning_af_bil_+_koerekort": SaerligIndretningAfBilKoerekort,
         }.get(form_name)
         if form_model is None:
             raise ValueError(f"Unsupported form name: {form_name}")
