@@ -281,7 +281,7 @@ HJAELPEMIDDEL_HANDLERS = {
     "hjaelpemiddel_andre_typer_af_hjaelpemidler": sel_112_113_113b_116,
     "hjaelpemiddel_til_barn": hjaelpemiddel_barn,
     "stoette_til_bil": sel_114,
-    "saerlig_indretning_af_bil_koerekort": sel_114,
+    "saerlig_indretning_af_bil_+_koerekort": sel_114,
     "boligindretning": sel_112_113_113b_116,
     "personligt_hjaelpemiddel__kopi__test": personligt_hjaelpemiddel,  # Test form for testing purposes, should be removed in production
     "staastoettestol__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
@@ -291,6 +291,6 @@ HJAELPEMIDDEL_HANDLERS = {
     "hjaelpemiddel_andre_typer_af_hjaelpemidler__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "stoette_til_bil__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
     "hjaelpemiddel_til_barn__kopi__test": hjaelpemiddel_barn,  # Test form for testing purposes, should be removed in production
-    "saerlig_indretning_af_bil_koerekort__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
+    "saerlig_indretning_af_bil_+_koerekort__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
     "boligindretning__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
 }
