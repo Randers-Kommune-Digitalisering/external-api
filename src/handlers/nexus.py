@@ -150,12 +150,6 @@ def sel_114(data: dict) -> bool:
     try:
         common_form_data = _prepare_common_form_data(data)
         form_name = _normalize_form_name(data["formName"])
-        form_model = {
-            "stoette_til_bil": StoetteTilBil,
-            "saerlig_indretning_af_bil_+_koerekort": SaerligIndretningAfBilKoerekort,
-        }.get(form_name)
-        if form_model is None:
-            raise ValueError(f"Unsupported form name: {form_name}")
 
         device_name = data.get("text0")
 
@@ -176,7 +170,54 @@ def sel_114(data: dict) -> bool:
         else:
             raise ValueError("At least one of type1 or type2 must be provided")
 
-        form = form_model(
+        form = StoetteTilBil(
+            form_doc_name=form_doc_name,
+            attachment_doc_name=attachment_doc_name,
+            device_name=device_name,
+            reason_text=reason_text,
+            type_text=type_text,
+            renewal_or_new_text=renewal_or_new_text or "",
+            **common_form_data,
+        )
+    except Exception:
+        logger.exception(f"Failed to prepare {form_name} form")
+        return False
+
+    try:
+        db.session.add(form)
+        db.session.commit()
+    except Exception:
+        logger.exception(f"Failed to save {form_name} form")
+        db.session.rollback()
+        return False
+    return True
+
+
+def sel_114_indretning(data: dict) -> bool:
+    try:
+        common_form_data = _prepare_common_form_data(data)
+        form_name = _normalize_form_name(data["formName"])
+
+        device_name = data.get("text0")
+
+        form_doc_name = f"Ansøgning {device_name}"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+
+        renewal_or_new_text = data.get("text4")
+        reason_text = data.get("text5")
+        type1 = (data.get("text6") or "").strip()
+        type2 = (data.get("text7") or "").strip()
+
+        if type1 and type2:
+            type_text = "§ 114 trivsel"
+        elif type1:
+            type_text = type1
+        elif type2:
+            type_text = type2
+        else:
+            raise ValueError("At least one of type1 or type2 must be provided")
+
+        form = SaerligIndretningAfBilKoerekort(
             form_doc_name=form_doc_name,
             attachment_doc_name=attachment_doc_name,
             device_name=device_name,
@@ -201,13 +242,6 @@ def sel_114(data: dict) -> bool:
 
 def hjaelpemiddel_barn(data: dict) -> bool:
     form_name = _normalize_form_name(data["formName"])
-    form_model = {
-        "hjaelpemiddel_til_barn": HjaelpemiddelTilBarn,
-    }.get(form_name)
-
-    if not form_model:
-        logger.error(f"Form model for '{form_name}' not found")
-        return False
 
     cpr = data.get("cpr")
     form_date = datetime.fromisoformat(data["date"].replace("Z", "+00:00")).date()
@@ -240,7 +274,7 @@ def hjaelpemiddel_barn(data: dict) -> bool:
     )
 
     try:
-        form = form_model(
+        form = HjaelpemiddelTilBarn(
             cpr=cpr,
             form_date=form_date,
             form_doc_name=form_doc_name,
@@ -281,7 +315,7 @@ HJAELPEMIDDEL_HANDLERS = {
     "hjaelpemiddel_andre_typer_af_hjaelpemidler": sel_112_113_113b_116,
     "hjaelpemiddel_til_barn": hjaelpemiddel_barn,
     "stoette_til_bil": sel_114,
-    "saerlig_indretning_af_bil_+_koerekort": sel_114,
+    "saerlig_indretning_af_bil_+_koerekort": sel_114_indretning,
     "boligindretning": sel_112_113_113b_116,
     "personligt_hjaelpemiddel__kopi__test": personligt_hjaelpemiddel,  # Test form for testing purposes, should be removed in production
     "staastoettestol__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
@@ -291,6 +325,6 @@ HJAELPEMIDDEL_HANDLERS = {
     "hjaelpemiddel_andre_typer_af_hjaelpemidler__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "stoette_til_bil__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
     "hjaelpemiddel_til_barn__kopi__test": hjaelpemiddel_barn,  # Test form for testing purposes, should be removed in production
-    "saerlig_indretning_af_bil_+_koerekort__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
+    "saerlig_indretning_af_bil_+_koerekort__kopi__test": sel_114_indretning,  # Test form for testing purposes, should be removed in production
     "boligindretning__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
 }

@@ -80,7 +80,6 @@ class StoetteTilBil(HjaelpemiddelBase):
 
 class SaerligIndretningAfBilKoerekort(HjaelpemiddelBase):
     __tablename__ = "saerlig_indretning_af_bil_koerekort"
-    type_text: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
 class Boligindretning(HjaelpemiddelBase):
