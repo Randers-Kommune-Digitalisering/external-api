@@ -205,24 +205,12 @@ def sel_114_indretning(data: dict) -> bool:
 
         renewal_or_new_text = data.get("text4")
         reason_text = data.get("text5")
-        type1 = (data.get("text6") or "").strip()
-        type2 = (data.get("text7") or "").strip()
-
-        if type1 and type2:
-            type_text = "§ 114 trivsel"
-        elif type1:
-            type_text = type1
-        elif type2:
-            type_text = type2
-        else:
-            raise ValueError("At least one of type1 or type2 must be provided")
 
         form = SaerligIndretningAfBilKoerekort(
             form_doc_name=form_doc_name,
             attachment_doc_name=attachment_doc_name,
             device_name=device_name,
             reason_text=reason_text,
-            type_text=type_text,
             renewal_or_new_text=renewal_or_new_text or "",
             **common_form_data,
         )
