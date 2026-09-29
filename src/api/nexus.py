@@ -16,7 +16,28 @@ def post_hjaelpemiddel_to_db():
         return Response('Request body must be JSON', status=400)
 
     data = request.get_json()
-    required_keys = {"cpr", "formName", "formData", "attachments", "date"}
+    required_keys = {
+        "formData",
+        "attachments",
+        "cpr",
+        "formName",
+        "deviceName1",
+        "deviceName2",
+        "newRenewal",
+        "reason",
+        "contactName1",
+        "contactName2",
+        "contactPhone1",
+        "contactPhone2",
+        "type1",
+        "type2",
+        "canCollectData",
+        "date",
+        "forAnother",
+        "relation",
+        "receiptData",
+        "otherRelation"
+    }
     missing_keys = sorted(required_keys - set(data or {}))
     if missing_keys:
         return Response(f"Missing required keys: {', '.join(missing_keys)}", status=400)

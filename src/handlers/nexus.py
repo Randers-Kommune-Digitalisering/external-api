@@ -35,9 +35,9 @@ def _prepare_common_form_data(data: dict) -> dict:
     if for_another:
         relation = data.get("relation") or ""
         on_behalf_of_relation = "Pårørende" if any(value in relation.lower() for value in ("forælder", "barn")) else "Andre" if "anden relation" in relation.lower() else None
-        on_behalf_of_name = data["text1"] if data["text1"] else None
-        on_behalf_of_phone = data["text2"] if data["text2"] else None
-        on_behalf_of_text = f"Borger er {relation.lower()}" if on_behalf_of_relation != "Andre" else f"{relation} - {data.get('text3')}"
+        on_behalf_of_name = data["contactName1"]
+        on_behalf_of_phone = data["contactPhone1"]
+        on_behalf_of_text = f"Borger er {relation.lower()}" if on_behalf_of_relation != "Andre" else f"{relation} - {data.get('otherRelation')}"
     else:
         on_behalf_of_relation = None
         on_behalf_of_name = None
@@ -62,7 +62,7 @@ def personligt_hjaelpemiddel(data: dict) -> bool:
     try:
         common_form_data = _prepare_common_form_data(data)
 
-        device_name = data["text0"]
+        device_name = data["deviceName1"]
 
         form_doc_name = (
             f"Ansøgning {device_name}"
@@ -71,7 +71,7 @@ def personligt_hjaelpemiddel(data: dict) -> bool:
         )
         attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
 
-        renewal_or_new_text = data.get("text4")
+        renewal_or_new_text = data.get("newRenewal")
         formatted_form_date = common_form_data["form_date"].strftime("%d-%m-%Y")
         reason_text = f"{formatted_form_date} - Digital ansøgning om {device_name}" if (device_name or "").replace(" ", "").strip() else f"{formatted_form_date} - Ansøgning om Personlig hjælpemiddel"
         if len(common_form_data["attachments"]) > 0:
@@ -115,14 +115,13 @@ def sel_112_113_113b_116(data: dict) -> bool:
         if form_model is None:
             raise ValueError(f"Unsupported form name: {form_name}")
 
-        default_device_name = "Elscooter" if form_name == "elscooter" else "Ståstøttestol"
-        device_name = data["text0"] if (data["text0"] or "").replace(" ", "").strip() else default_device_name
+        device_name = data["deviceName1"]
 
         form_doc_name = f"Ansøgning {device_name}"
-        attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}"
 
-        renewal_or_new_text = data.get("text4")
-        reason_text = data.get("text5")
+        renewal_or_new_text = data.get("newRenewal")
+        reason_text = data.get("reason")
 
         form = form_model(
             form_doc_name=form_doc_name,
@@ -151,15 +150,15 @@ def sel_114(data: dict) -> bool:
         common_form_data = _prepare_common_form_data(data)
         form_name = _normalize_form_name(data["formName"])
 
-        device_name = data.get("text0")
+        device_name = data.get("deviceName1")
 
         form_doc_name = f"Ansøgning {device_name}"
-        attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}"
 
-        renewal_or_new_text = data.get("text4")
-        reason_text = data.get("text5")
-        type1 = (data.get("text6") or "").strip()
-        type2 = (data.get("text7") or "").strip()
+        renewal_or_new_text = data.get("newRenewal")
+        reason_text = data.get("reason")
+        type1 = (data.get("type1") or "").strip()
+        type2 = (data.get("type2") or "").strip()
 
         if type1 and type2:
             type_text = "§ 114 trivsel"
@@ -198,13 +197,13 @@ def sel_114_indretning(data: dict) -> bool:
         common_form_data = _prepare_common_form_data(data)
         form_name = _normalize_form_name(data["formName"])
 
-        device_name = data.get("text0")
+        device_name = data.get("deviceName1")
 
         form_doc_name = f"Ansøgning {device_name}"
-        attachment_doc_name = f"Ansøgning Bilag {device_name}" if (device_name or "").replace(" ", "").strip() else "Ansøgning Bilag Personlig hjælpemiddel"
+        attachment_doc_name = f"Ansøgning Bilag {device_name}"
 
-        renewal_or_new_text = data.get("text4")
-        reason_text = data.get("text5")
+        renewal_or_new_text = data.get("newRenewal")
+        reason_text = data.get("reason")
 
         form = SaerligIndretningAfBilKoerekort(
             form_doc_name=form_doc_name,
@@ -241,19 +240,19 @@ def hjaelpemiddel_barn(data: dict) -> bool:
     for_another = data.get("forAnother", True) or True
 
     can_collect_data: bool = data.get("canCollectData", False) is True
-    device_name = data.get("text0") or "Hjælpemiddel til barn"
-    reason_text = data.get("text5") or "Digital ansøgning hjælpemiddel til barn"
+    device_name = data.get("deviceName1") or "Hjælpemiddel til barn"
+    reason_text = data.get("reason") or "Digital ansøgning hjælpemiddel til barn"
 
     relation = data.get("relation") or ""
     on_behalf_of_relation = "Pårørende" if any(value in relation.lower() for value in ("forælder", "forældre")) else "Andre"
 
-    on_behalf_of_name_1 = data.get("text1")
-    on_behalf_of_phone_1 = data.get("text2")
+    on_behalf_of_name_1 = data.get("contactName1")
+    on_behalf_of_phone_1 = data.get("contactPhone1")
 
-    on_behalf_of_name_2 = data.get("text3")
-    on_behalf_of_phone_2 = data.get("text4")
+    on_behalf_of_name_2 = data.get("contactName2")
+    on_behalf_of_phone_2 = data.get("contactPhone2")
 
-    who = data.get("text6")
+    who = data.get("otherRelation")
 
     on_behalf_of_text = (
         f"{who}\n {on_behalf_of_name_1}\n {on_behalf_of_phone_1}" if who
