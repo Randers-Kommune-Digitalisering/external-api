@@ -32,4 +32,4 @@ EXPOSE $PORT
 # Set user
 USER $USER_ID
 
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} main:app"]
+CMD ["sh", "-c", "python -m flask --app main db upgrade && exec gunicorn --bind 0.0.0.0:${PORT} main:app"]

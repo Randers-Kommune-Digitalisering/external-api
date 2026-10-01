@@ -30,6 +30,7 @@ class HjaelpemiddelBase(db.Model):
     form_date: Mapped[date] = mapped_column(Date)
     form_doc_name: Mapped[str] = mapped_column(String(255), nullable=False)
     form_pdf_base64: Mapped[str] = mapped_column(Text, nullable=False)
+    receipt_pdf_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
     attachment_doc_name: Mapped[str] = mapped_column(String(255), nullable=False)
     attachments: Mapped[list] = mapped_column(JSONB, nullable=True, default=list)
 

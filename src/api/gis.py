@@ -26,6 +26,7 @@ def raagereder():
 
     try:
         geojson = data['geojson']
+        data_type = data.get('type')
         if isinstance(geojson, str):
             try:
                 geojson = json.loads(geojson)
@@ -43,8 +44,8 @@ def raagereder():
             next_id = result.scalar() if result else 1
 
             sql = text(
-                f"INSERT INTO {GIS_DB_SCHEMA}.{GIS_DB_RAAGEREDER_TABLE} (wkb_geometry, oprettet_dato, geojson, id) "
-                f"VALUES (ST_SetSRID(ST_GeomFromGeoJSON(:geom_json), 25832), :oprettet_dato, :geojson, :id);"
+                f"INSERT INTO {GIS_DB_SCHEMA}.{GIS_DB_RAAGEREDER_TABLE} (wkb_geometry, oprettet_dato, geojson, id, \"type\") "
+                f"VALUES (ST_SetSRID(ST_GeomFromGeoJSON(:geom_json), 25832), :oprettet_dato, :geojson, :id, :type);"
             )
 
             for feature in geojson['features']:
@@ -55,7 +56,8 @@ def raagereder():
                     'geom_json': geom_json,
                     'oprettet_dato': oprettet_dato,
                     'geojson': geom_json,
-                    'id': next_id
+                    'id': next_id,
+                    'type': data_type
                 })
             logger.info("GIS raagereder data added to database.")
     except Exception as e:

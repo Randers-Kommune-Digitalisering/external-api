@@ -1,7 +1,7 @@
 from flask import Flask
+from flask_migrate import Migrate
 from healthcheck import HealthCheck
 from prometheus_client import generate_latest
-from sqlalchemy import text
 
 from api.skole_ad import skole_ad_bp
 from api.keycloak import keycloak_bp
@@ -10,8 +10,7 @@ from api.nexus import nexus_bp
 from extensions import db
 from utils.config import DEBUG, PORT, \
     META_DB_HOST, META_DB_PORT, META_DB_NAME, META_DB_USER, META_DB_PASS, \
-    GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_USER, GIS_DB_PASS, SKOLE_AD_DB_SCHEMA, \
-    XFLOW_NEXUS_HJAELPEMIDDEL_DB_TABLE
+    GIS_DB_HOST, GIS_DB_PORT, GIS_DB_NAME, GIS_DB_USER, GIS_DB_PASS, XFLOW_NEXUS_DB_SCHEMA
 
 
 def create_app():
@@ -21,11 +20,7 @@ def create_app():
         "gis": f"postgresql://{GIS_DB_USER}:{GIS_DB_PASS}@{GIS_DB_HOST}:{GIS_DB_PORT}/{GIS_DB_NAME}"
     }
     db.init_app(app)
-    with app.app_context():
-        for schema in (SKOLE_AD_DB_SCHEMA, XFLOW_NEXUS_HJAELPEMIDDEL_DB_TABLE):
-            db.session.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
-        db.session.commit()
-        db.create_all()
+    Migrate(app, db, include_schemas=True, version_table_schema=XFLOW_NEXUS_DB_SCHEMA)
 
     health = HealthCheck()
     app.add_url_rule('/healthz', 'healthcheck', view_func=lambda: health.run())
