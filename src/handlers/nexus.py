@@ -311,7 +311,7 @@ HJAELPEMIDDEL_HANDLERS = {
     "elscooter__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "servicehund__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "kommunikationshjaelpemiddel__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
-    "hjaelpemiddel_andre_typer_af_hjaelpemidler__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
+    "hjaelpemiddel__andre_typer_af_hjaelpemidler__kopi__test": sel_112_113_113b_116,  # Test form for testing purposes, should be removed in production
     "stoette_til_bil__kopi__test": sel_114,  # Test form for testing purposes, should be removed in production
     "hjaelpemiddel_til_barn__kopi__test": hjaelpemiddel_barn,  # Test form for testing purposes, should be removed in production
     "saerlig_indretning_af_bil_+_koerekort__kopi__test": sel_114_indretning,  # Test form for testing purposes, should be removed in production
