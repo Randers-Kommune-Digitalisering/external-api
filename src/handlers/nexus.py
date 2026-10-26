@@ -110,7 +110,7 @@ def sel_112_113_113b_116(data: dict) -> bool:
             "elscooter": Elscooter,
             "servicehund": Servicehund,
             "kommunikationshjaelpemiddel": Kommunikationshjaelpemiddel,
-            "hjaelpemiddel_andre_typer_af_hjaelpemidler": HjaelpemiddelAndreTyperAfHjaelpemidler,
+            "hjaelpemiddel__andre_typer_af_hjaelpemidler": HjaelpemiddelAndreTyperAfHjaelpemidler,
             "boligindretning": Boligindretning,
         }.get(form_name)
         if form_model is None:
@@ -301,7 +301,7 @@ HJAELPEMIDDEL_HANDLERS = {
     "elscooter": sel_112_113_113b_116,
     "servicehund": sel_112_113_113b_116,
     "kommunikationshjaelpemiddel": sel_112_113_113b_116,
-    "hjaelpemiddel_andre_typer_af_hjaelpemidler": sel_112_113_113b_116,
+    "hjaelpemiddel__andre_typer_af_hjaelpemidler": sel_112_113_113b_116,
     "hjaelpemiddel_til_barn": hjaelpemiddel_barn,
     "stoette_til_bil": sel_114,
     "saerlig_indretning_af_bil_+_koerekort": sel_114_indretning,
