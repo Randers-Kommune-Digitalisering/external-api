@@ -161,14 +161,12 @@ def sel_114(data: dict) -> bool:
         type1 = (data.get("type1") or "").strip()
         type2 = (data.get("type2") or "").strip()
 
-        if type1 and type2:
-            type_text = "§ 114 trivsel"
-        elif type1:
+        if type1 and not type2:
             type_text = type1
-        elif type2:
+        elif type2 and not type1:
             type_text = type2
         else:
-            raise ValueError("At least one of type1 or type2 must be provided")
+            type_text = "§ 114 trivsel"
 
         form = StoetteTilBil(
             form_doc_name=form_doc_name,
